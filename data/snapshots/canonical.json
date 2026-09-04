@@ -2809,11 +2809,11 @@
     },
     {
       "date": "2026-02-25",
-      "evidence": "team poster + message naming Guille champion",
+      "evidence": "team poster + message naming Guille champion; external 2026 site confirms exact 4-5 score",
       "outcome": "2",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 4,
+      "score2": 5,
       "status": "verified",
       "team1": [
         "Andy S",
@@ -2912,12 +2912,38 @@
       "tournament": "T9 Mar-May26"
     },
     {
+      "date": "2026-03-25",
+      "evidence": "external 2026 match record with complete teams and exact score",
+      "outcome": "D",
+      "quality": "exact score",
+      "score1": 3,
+      "score2": 3,
+      "status": "verified",
+      "team1": [
+        "Pau",
+        "Milton",
+        "Ivo",
+        "Dani",
+        "Des",
+        "Mario"
+      ],
+      "team2": [
+        "Gimmi",
+        "Aidan",
+        "Yoann",
+        "Pete",
+        "Mark",
+        "Mati"
+      ],
+      "tournament": "T9 Mar-May26"
+    },
+    {
       "date": "2026-04-01",
-      "evidence": "four-team event images plus explicit winning-team image",
+      "evidence": "four-team event images plus explicit winning-team image; external 2026 site confirms exact 6-0 score",
       "outcome": "1",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 6,
+      "score2": 0,
       "status": "verified",
       "team1": [
         "Facu",
@@ -3155,11 +3181,11 @@
     },
     {
       "date": "2026-06-10",
-      "evidence": "team image plus standings delta across the next table",
+      "evidence": "team image plus standings delta across the next table; external 2026 site confirms exact score (published sides reversed)",
       "outcome": "2",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 5,
+      "score2": 8,
       "status": "verified",
       "team1": [
         "Ivo",
@@ -3181,11 +3207,11 @@
     },
     {
       "date": "2026-06-17",
-      "evidence": "confirmed lineup plus player-by-player standings delta",
+      "evidence": "confirmed lineup plus player-by-player standings delta; external 2026 site confirms exact 13-3 score",
       "outcome": "1",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 13,
+      "score2": 3,
       "status": "verified",
       "team1": [
         "Mario",
@@ -3207,11 +3233,11 @@
     },
     {
       "date": "2026-07-01",
-      "evidence": "team image plus before-after standings delta",
+      "evidence": "team image plus before-after standings delta; external 2026 site confirms exact 10-3 score",
       "outcome": "1",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 10,
+      "score2": 3,
       "status": "verified",
       "team1": [
         "Mario",
@@ -3233,11 +3259,11 @@
     },
     {
       "date": "2026-07-08",
-      "evidence": "team image plus before-after standings delta",
+      "evidence": "team image plus before-after standings delta; external 2026 site confirms exact 5-3 score",
       "outcome": "1",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 5,
+      "score2": 3,
       "status": "verified",
       "team1": [
         "Mario",
@@ -3259,27 +3285,27 @@
     },
     {
       "date": "2026-07-15",
-      "evidence": "official 19:00 final roster plus standings delta; later friendly excluded",
+      "evidence": "official 19:00 final roster plus standings delta; external 2026 site confirms score and corrects Pau/Sergio Perez team assignment",
       "outcome": "1",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 4,
+      "score2": 3,
       "status": "verified",
       "team1": [
-        "Niyi",
-        "Ivo",
-        "Yoann",
         "Gus",
+        "Ivo",
+        "Niyi",
+        "Pau",
         "Pete",
-        "Sergio Pérez"
+        "Yoann"
       ],
       "team2": [
-        "Dani",
-        "Gimmi",
+        "Aidan",
         "Facu",
-        "Pau",
+        "Gimmi",
         "Pablo",
-        "Aidan"
+        "Sergio Pérez",
+        "Dani"
       ],
       "tournament": "T10 Jun-Sep26"
     },
@@ -3311,11 +3337,11 @@
     },
     {
       "date": "2026-07-29",
-      "evidence": "team image plus next-table standings delta",
+      "evidence": "team image plus next-table standings delta; external 2026 site confirms roster, winner and 11-6 score (site date 2026-07-31)",
       "outcome": "2",
-      "quality": "W-D-L outcome only",
-      "score1": null,
-      "score2": null,
+      "quality": "exact score",
+      "score1": 6,
+      "score2": 11,
       "status": "verified",
       "team1": [
         "Dani",
@@ -3337,7 +3363,7 @@
     },
     {
       "date": "2026-08-05",
-      "evidence": "team image plus live score and standings delta",
+      "evidence": "team image plus live score and standings delta; external 2026 site identifies Sergio (not Sergio Pérez)",
       "outcome": "1",
       "quality": "exact score",
       "score1": 7,
@@ -3354,7 +3380,7 @@
         "Yoann",
         "Martin",
         "Milton",
-        "Sergio Pérez",
+        "Sergio",
         "Mati"
       ],
       "tournament": "T10 Jun-Sep26"
@@ -3380,6 +3406,30 @@
         "Mati",
         "Sergio",
         "Salsa"
+      ],
+      "tournament": "T10 Jun-Sep26"
+    },
+    {
+      "date": "2026-08-26",
+      "evidence": "external 2026 match record with complete teams and exact score",
+      "outcome": "2",
+      "quality": "exact score",
+      "score1": 5,
+      "score2": 10,
+      "status": "verified",
+      "team1": [
+        "Aidan",
+        "Facu",
+        "Gimmi",
+        "Ivo",
+        "Mati"
+      ],
+      "team2": [
+        "Andy S",
+        "Gus",
+        "Pablo",
+        "Salsa",
+        "Sergio"
       ],
       "tournament": "T10 Jun-Sep26"
     },
@@ -3444,12 +3494,12 @@
     },
     {
       "draws": 2,
-      "losses": 10,
+      "losses": 11,
       "name": [
         "Aidan",
         "Facu"
       ],
-      "played": 23,
+      "played": 24,
       "wins": 11
     },
     {
@@ -3499,8 +3549,8 @@
         "Andy S",
         "Sergio"
       ],
-      "played": 13,
-      "wins": 3
+      "played": 14,
+      "wins": 4
     },
     {
       "draws": 0,
@@ -3599,8 +3649,8 @@
         "Gus",
         "Pablo"
       ],
-      "played": 17,
-      "wins": 6
+      "played": 18,
+      "wins": 7
     },
     {
       "draws": 0,
@@ -3609,8 +3659,8 @@
         "Gus",
         "Salsa"
       ],
-      "played": 8,
-      "wins": 4
+      "played": 9,
+      "wins": 5
     },
     {
       "draws": 2,
@@ -3709,8 +3759,8 @@
         "Pablo",
         "Salsa"
       ],
-      "played": 14,
-      "wins": 7
+      "played": 15,
+      "wins": 8
     },
     {
       "draws": 0,
@@ -3759,8 +3809,8 @@
         "Andy S",
         "Gus"
       ],
-      "played": 15,
-      "wins": 7
+      "played": 16,
+      "wins": 8
     },
     {
       "draws": 0,
@@ -3769,8 +3819,8 @@
         "Andy S",
         "Salsa"
       ],
-      "played": 12,
-      "wins": 8
+      "played": 13,
+      "wins": 9
     },
     {
       "draws": 0,
@@ -3809,8 +3859,8 @@
         "Gus",
         "Sergio"
       ],
-      "played": 17,
-      "wins": 9
+      "played": 18,
+      "wins": 10
     },
     {
       "draws": 0,
@@ -3819,8 +3869,8 @@
         "Salsa",
         "Sergio"
       ],
-      "played": 6,
-      "wins": 4
+      "played": 7,
+      "wins": 5
     },
     {
       "draws": 2,
@@ -3884,12 +3934,12 @@
     },
     {
       "draws": 6,
-      "losses": 19,
+      "losses": 20,
       "name": [
         "Facu",
         "Mati"
       ],
-      "played": 42,
+      "played": 43,
       "wins": 17
     },
     {
@@ -4009,8 +4059,8 @@
         "Andy S",
         "Pablo"
       ],
-      "played": 22,
-      "wins": 9
+      "played": 23,
+      "wins": 10
     },
     {
       "draws": 2,
@@ -4073,13 +4123,13 @@
       "wins": 1
     },
     {
-      "draws": 3,
-      "losses": 9,
+      "draws": 4,
+      "losses": 10,
       "name": [
         "Aidan",
         "Mati"
       ],
-      "played": 20,
+      "played": 22,
       "wins": 8
     },
     {
@@ -4104,12 +4154,12 @@
     },
     {
       "draws": 3,
-      "losses": 12,
+      "losses": 13,
       "name": [
         "Mati",
         "Sergio"
       ],
-      "played": 23,
+      "played": 24,
       "wins": 8
     },
     {
@@ -4119,8 +4169,8 @@
         "Pablo",
         "Sergio"
       ],
-      "played": 23,
-      "wins": 5
+      "played": 24,
+      "wins": 6
     },
     {
       "draws": 1,
@@ -4263,13 +4313,13 @@
       "wins": 5
     },
     {
-      "draws": 3,
-      "losses": 9,
+      "draws": 4,
+      "losses": 10,
       "name": [
         "Gimmi",
         "Mati"
       ],
-      "played": 20,
+      "played": 22,
       "wins": 8
     },
     {
@@ -4364,32 +4414,32 @@
     },
     {
       "draws": 3,
-      "losses": 6,
+      "losses": 7,
       "name": [
         "Facu",
         "Gimmi"
       ],
-      "played": 17,
+      "played": 18,
       "wins": 8
     },
     {
       "draws": 1,
-      "losses": 7,
+      "losses": 8,
       "name": [
         "Facu",
         "Ivo"
       ],
-      "played": 15,
+      "played": 16,
       "wins": 7
     },
     {
       "draws": 1,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Gimmi",
         "Ivo"
       ],
-      "played": 8,
+      "played": 9,
       "wins": 5
     },
     {
@@ -4563,13 +4613,13 @@
       "wins": 3
     },
     {
-      "draws": 4,
+      "draws": 5,
       "losses": 8,
       "name": [
         "Gimmi",
         "Pete"
       ],
-      "played": 19,
+      "played": 20,
       "wins": 7
     },
     {
@@ -4583,13 +4633,13 @@
       "wins": 3
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 17,
       "name": [
         "Mati",
         "Pete"
       ],
-      "played": 23,
+      "played": 24,
       "wins": 4
     },
     {
@@ -4713,23 +4763,23 @@
       "wins": 11
     },
     {
-      "draws": 4,
+      "draws": 5,
       "losses": 11,
       "name": [
         "Mati",
         "Yoann"
       ],
-      "played": 23,
+      "played": 24,
       "wins": 8
     },
     {
       "draws": 4,
-      "losses": 10,
+      "losses": 11,
       "name": [
         "Sergio",
         "Yoann"
       ],
-      "played": 22,
+      "played": 23,
       "wins": 8
     },
     {
@@ -4834,22 +4884,22 @@
     },
     {
       "draws": 1,
-      "losses": 6,
+      "losses": 7,
       "name": [
         "Aidan",
         "Ivo"
       ],
-      "played": 13,
+      "played": 14,
       "wins": 6
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 4,
       "name": [
         "Des",
         "Ivo"
       ],
-      "played": 10,
+      "played": 11,
       "wins": 5
     },
     {
@@ -4874,12 +4924,12 @@
     },
     {
       "draws": 2,
-      "losses": 9,
+      "losses": 10,
       "name": [
         "Ivo",
         "Mati"
       ],
-      "played": 18,
+      "played": 19,
       "wins": 7
     },
     {
@@ -4924,12 +4974,12 @@
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Martin",
         "Sergio"
       ],
-      "played": 8,
+      "played": 9,
       "wins": 6
     },
     {
@@ -5043,13 +5093,13 @@
       "wins": 6
     },
     {
-      "draws": 3,
-      "losses": 7,
+      "draws": 4,
+      "losses": 8,
       "name": [
         "Aidan",
         "Gimmi"
       ],
-      "played": 20,
+      "played": 22,
       "wins": 10
     },
     {
@@ -5423,13 +5473,13 @@
       "wins": 6
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Des",
         "Milton"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 1
     },
     {
@@ -5483,23 +5533,23 @@
       "wins": 4
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 6,
       "name": [
         "Aidan",
         "Yoann"
       ],
-      "played": 19,
+      "played": 20,
       "wins": 11
     },
     {
-      "draws": 4,
+      "draws": 5,
       "losses": 6,
       "name": [
         "Gimmi",
         "Yoann"
       ],
-      "played": 21,
+      "played": 22,
       "wins": 11
     },
     {
@@ -5623,13 +5673,13 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 5,
       "name": [
         "Ivo",
         "Milton"
       ],
-      "played": 7,
+      "played": 8,
       "wins": 2
     },
     {
@@ -5643,13 +5693,13 @@
       "wins": 2
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 7,
       "name": [
         "Aidan",
         "Pete"
       ],
-      "played": 10,
+      "played": 11,
       "wins": 3
     },
     {
@@ -5663,13 +5713,13 @@
       "wins": 5
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 8,
       "name": [
         "Pete",
         "Yoann"
       ],
-      "played": 18,
+      "played": 19,
       "wins": 8
     },
     {
@@ -6333,13 +6383,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Des",
         "Pau"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -6439,8 +6489,8 @@
         "Pau",
         "Pete"
       ],
-      "played": 10,
-      "wins": 2
+      "played": 11,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -6469,8 +6519,8 @@
         "Pau",
         "Yoann"
       ],
-      "played": 15,
-      "wins": 8
+      "played": 16,
+      "wins": 9
     },
     {
       "draws": 0,
@@ -6703,13 +6753,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 5,
       "name": [
         "Dani",
         "Des"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 0
     },
     {
@@ -7103,13 +7153,13 @@
       "wins": 0
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 2,
       "name": [
         "Mark",
         "Mati"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -7184,12 +7234,12 @@
     },
     {
       "draws": 3,
-      "losses": 6,
+      "losses": 5,
       "name": [
         "Pablo",
         "Pau"
       ],
-      "played": 11,
+      "played": 10,
       "wins": 2
     },
     {
@@ -7244,12 +7294,12 @@
     },
     {
       "draws": 1,
-      "losses": 4,
+      "losses": 5,
       "name": [
         "Milton",
         "Sergio"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 0
     },
     {
@@ -7264,12 +7314,12 @@
     },
     {
       "draws": 0,
-      "losses": 9,
+      "losses": 8,
       "name": [
         "Aidan",
         "Pau"
       ],
-      "played": 15,
+      "played": 14,
       "wins": 6
     },
     {
@@ -7333,8 +7383,8 @@
       "wins": 6
     },
     {
-      "draws": 0,
-      "losses": 4,
+      "draws": 1,
+      "losses": 3,
       "name": [
         "Dani",
         "Pau"
@@ -7583,13 +7633,13 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 8,
       "name": [
         "Dani",
         "Ivo"
       ],
-      "played": 14,
+      "played": 15,
       "wins": 6
     },
     {
@@ -7689,18 +7739,18 @@
         "Gus",
         "Pau"
       ],
-      "played": 11,
-      "wins": 8
+      "played": 12,
+      "wins": 9
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 4,
       "name": [
         "Ivo",
         "Pau"
       ],
-      "played": 10,
-      "wins": 5
+      "played": 12,
+      "wins": 6
     },
     {
       "draws": 1,
@@ -7829,8 +7879,8 @@
         "Niyi",
         "Pau"
       ],
-      "played": 11,
-      "wins": 6
+      "played": 12,
+      "wins": 7
     },
     {
       "draws": 1,
@@ -7854,12 +7904,12 @@
     },
     {
       "draws": 0,
-      "losses": 5,
+      "losses": 4,
       "name": [
         "Facu",
         "Pau"
       ],
-      "played": 7,
+      "played": 6,
       "wins": 2
     },
     {
@@ -7874,12 +7924,12 @@
     },
     {
       "draws": 1,
-      "losses": 4,
+      "losses": 3,
       "name": [
         "Gimmi",
         "Pau"
       ],
-      "played": 8,
+      "played": 7,
       "wins": 3
     },
     {
@@ -8103,13 +8153,13 @@
       "wins": 0
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 4,
       "name": [
         "Dani",
         "Milton"
       ],
-      "played": 7,
+      "played": 8,
       "wins": 2
     },
     {
@@ -8133,13 +8183,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Aidan",
         "Mark"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 3
     },
     {
@@ -8153,23 +8203,23 @@
       "wins": 3
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Gimmi",
         "Mark"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Mark",
         "Pete"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -8183,13 +8233,13 @@
       "wins": 3
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Mark",
         "Yoann"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -8363,13 +8413,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Milton",
         "Pau"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -8663,13 +8713,13 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Dani",
         "Mario"
       ],
-      "played": 6,
+      "played": 7,
       "wins": 3
     },
     {
@@ -8683,13 +8733,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Mario",
         "Milton"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 1
     },
     {
@@ -8763,13 +8813,13 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Des",
         "Mario"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -8803,6 +8853,26 @@
       "wins": 0
     },
     {
+      "draws": 1,
+      "losses": 1,
+      "name": [
+        "Ivo",
+        "Mario"
+      ],
+      "played": 3,
+      "wins": 1
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Mario",
+        "Pau"
+      ],
+      "played": 2,
+      "wins": 1
+    },
+    {
       "draws": 0,
       "losses": 1,
       "name": [
@@ -8821,16 +8891,6 @@
       ],
       "played": 3,
       "wins": 3
-    },
-    {
-      "draws": 0,
-      "losses": 0,
-      "name": [
-        "Mario",
-        "Pau"
-      ],
-      "played": 1,
-      "wins": 1
     },
     {
       "draws": 0,
@@ -8984,12 +9044,12 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Aidan",
         "Sergio Pérez"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -9004,19 +9064,9 @@
     },
     {
       "draws": 0,
-      "losses": 2,
-      "name": [
-        "Facu",
-        "Sergio Pérez"
-      ],
-      "played": 3,
-      "wins": 1
-    },
-    {
-      "draws": 0,
       "losses": 3,
       "name": [
-        "Mati",
+        "Facu",
         "Sergio Pérez"
       ],
       "played": 4,
@@ -9024,22 +9074,32 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
-        "Pablo",
+        "Mati",
         "Sergio Pérez"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
+      "name": [
+        "Pablo",
+        "Sergio Pérez"
+      ],
+      "played": 3,
+      "wins": 1
+    },
+    {
+      "draws": 0,
+      "losses": 2,
       "name": [
         "Dani",
         "Sergio Pérez"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -9049,8 +9109,8 @@
         "Gus",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -9059,8 +9119,8 @@
         "Ivo",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -9069,8 +9129,8 @@
         "Pete",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -9101,16 +9161,6 @@
       ],
       "played": 4,
       "wins": 4
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Ivo",
-        "Mario"
-      ],
-      "played": 2,
-      "wins": 1
     },
     {
       "draws": 0,
@@ -9169,8 +9219,8 @@
         "Niyi",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -9196,11 +9246,11 @@
       "draws": 0,
       "losses": 1,
       "name": [
-        "Sergio Pérez",
-        "Yoann"
+        "Gimmi",
+        "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -9221,26 +9271,6 @@
       ],
       "played": 1,
       "wins": 1
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Martin",
-        "Sergio Pérez"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Milton",
-        "Sergio Pérez"
-      ],
-      "played": 1,
-      "wins": 0
     }
   ],
   "players": [
@@ -9252,10 +9282,10 @@
       "wins": 8
     },
     {
-      "draws": 8,
-      "losses": 30,
+      "draws": 9,
+      "losses": 31,
       "name": "Aidan",
-      "played": 71,
+      "played": 73,
       "wins": 33
     },
     {
@@ -9283,8 +9313,8 @@
       "draws": 8,
       "losses": 32,
       "name": "Andy S",
-      "played": 70,
-      "wins": 30
+      "played": 71,
+      "wins": 31
     },
     {
       "draws": 0,
@@ -9315,10 +9345,10 @@
       "wins": 0
     },
     {
-      "draws": 8,
+      "draws": 9,
       "losses": 33,
       "name": "Dani",
-      "played": 65,
+      "played": 66,
       "wins": 24
     },
     {
@@ -9329,10 +9359,10 @@
       "wins": 3
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 25,
       "name": "Des",
-      "played": 47,
+      "played": 48,
       "wins": 20
     },
     {
@@ -9358,16 +9388,16 @@
     },
     {
       "draws": 10,
-      "losses": 32,
+      "losses": 33,
       "name": "Facu",
-      "played": 83,
+      "played": 84,
       "wins": 41
     },
     {
-      "draws": 10,
-      "losses": 27,
+      "draws": 11,
+      "losses": 28,
       "name": "Gimmi",
-      "played": 70,
+      "played": 72,
       "wins": 33
     },
     {
@@ -9381,8 +9411,8 @@
       "draws": 8,
       "losses": 33,
       "name": "Gus",
-      "played": 82,
-      "wins": 41
+      "played": 83,
+      "wins": 42
     },
     {
       "draws": 2,
@@ -9392,10 +9422,10 @@
       "wins": 9
     },
     {
-      "draws": 3,
-      "losses": 25,
+      "draws": 4,
+      "losses": 26,
       "name": "Ivo",
-      "played": 54,
+      "played": 56,
       "wins": 26
     },
     {
@@ -9413,17 +9443,17 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 4,
       "name": "Mario",
-      "played": 9,
+      "played": 10,
       "wins": 5
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 8,
       "name": "Mark",
-      "played": 18,
+      "played": 19,
       "wins": 8
     },
     {
@@ -9434,10 +9464,10 @@
       "wins": 27
     },
     {
-      "draws": 11,
-      "losses": 49,
+      "draws": 12,
+      "losses": 50,
       "name": "Mati",
-      "played": 90,
+      "played": 92,
       "wins": 30
     },
     {
@@ -9455,10 +9485,10 @@
       "wins": 13
     },
     {
-      "draws": 2,
+      "draws": 3,
       "losses": 13,
       "name": "Milton",
-      "played": 22,
+      "played": 23,
       "wins": 7
     },
     {
@@ -9479,21 +9509,21 @@
       "draws": 9,
       "losses": 33,
       "name": "Pablo",
-      "played": 71,
-      "wins": 29
+      "played": 72,
+      "wins": 30
     },
     {
-      "draws": 4,
-      "losses": 18,
+      "draws": 5,
+      "losses": 17,
       "name": "Pau",
-      "played": 41,
-      "wins": 19
+      "played": 42,
+      "wins": 20
     },
     {
-      "draws": 6,
+      "draws": 7,
       "losses": 33,
       "name": "Pete",
-      "played": 61,
+      "played": 62,
       "wins": 22
     },
     {
@@ -9528,22 +9558,22 @@
       "draws": 1,
       "losses": 11,
       "name": "Salsa",
-      "played": 32,
-      "wins": 20
+      "played": 33,
+      "wins": 21
     },
     {
       "draws": 8,
-      "losses": 35,
+      "losses": 36,
       "name": "Sergio",
-      "played": 71,
-      "wins": 28
+      "played": 73,
+      "wins": 29
     },
     {
       "draws": 0,
       "losses": 4,
       "name": "Sergio Pérez",
-      "played": 6,
-      "wins": 2
+      "played": 5,
+      "wins": 1
     },
     {
       "draws": 0,
@@ -9567,10 +9597,10 @@
       "wins": 0
     },
     {
-      "draws": 10,
+      "draws": 11,
       "losses": 28,
       "name": "Yoann",
-      "played": 73,
+      "played": 74,
       "wins": 35
     }
   ],
@@ -10086,9 +10116,9 @@
     "T10 Jun-Sep26": [
       {
         "draws": 0,
-        "losses": 3,
+        "losses": 4,
         "name": "Aidan",
-        "played": 8,
+        "played": 9,
         "wins": 5
       },
       {
@@ -10102,8 +10132,8 @@
         "draws": 0,
         "losses": 1,
         "name": "Andy S",
-        "played": 7,
-        "wins": 6
+        "played": 8,
+        "wins": 7
       },
       {
         "draws": 0,
@@ -10114,30 +10144,30 @@
       },
       {
         "draws": 0,
-        "losses": 3,
+        "losses": 4,
         "name": "Facu",
-        "played": 8,
+        "played": 9,
         "wins": 5
       },
       {
         "draws": 0,
-        "losses": 3,
+        "losses": 4,
         "name": "Gimmi",
-        "played": 6,
+        "played": 7,
         "wins": 3
       },
       {
         "draws": 0,
         "losses": 3,
         "name": "Gus",
-        "played": 6,
-        "wins": 3
+        "played": 7,
+        "wins": 4
       },
       {
         "draws": 0,
-        "losses": 7,
+        "losses": 8,
         "name": "Ivo",
-        "played": 9,
+        "played": 10,
         "wins": 2
       },
       {
@@ -10163,9 +10193,9 @@
       },
       {
         "draws": 0,
-        "losses": 5,
+        "losses": 6,
         "name": "Mati",
-        "played": 7,
+        "played": 8,
         "wins": 2
       },
       {
@@ -10186,15 +10216,15 @@
         "draws": 0,
         "losses": 4,
         "name": "Pablo",
-        "played": 8,
-        "wins": 4
+        "played": 9,
+        "wins": 5
       },
       {
         "draws": 0,
-        "losses": 3,
+        "losses": 2,
         "name": "Pau",
         "played": 4,
-        "wins": 1
+        "wins": 2
       },
       {
         "draws": 0,
@@ -10221,22 +10251,22 @@
         "draws": 0,
         "losses": 1,
         "name": "Salsa",
-        "played": 4,
-        "wins": 3
+        "played": 5,
+        "wins": 4
       },
       {
         "draws": 0,
-        "losses": 1,
+        "losses": 2,
         "name": "Sergio",
-        "played": 2,
-        "wins": 1
+        "played": 4,
+        "wins": 2
       },
       {
         "draws": 0,
         "losses": 4,
         "name": "Sergio Pérez",
-        "played": 6,
-        "wins": 2
+        "played": 5,
+        "wins": 1
       },
       {
         "draws": 0,
@@ -11466,10 +11496,10 @@
     ],
     "T9 Mar-May26": [
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 3,
         "name": "Aidan",
-        "played": 7,
+        "played": 8,
         "wins": 3
       },
       {
@@ -11494,17 +11524,17 @@
         "wins": 2
       },
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 4,
         "name": "Dani",
-        "played": 8,
+        "played": 9,
         "wins": 3
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 2,
         "name": "Des",
-        "played": 3,
+        "played": 4,
         "wins": 1
       },
       {
@@ -11515,10 +11545,10 @@
         "wins": 2
       },
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 3,
         "name": "Gimmi",
-        "played": 4,
+        "played": 5,
         "wins": 0
       },
       {
@@ -11536,24 +11566,24 @@
         "wins": 7
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 2,
         "name": "Ivo",
-        "played": 4,
+        "played": 5,
         "wins": 2
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 3,
         "name": "Mario",
-        "played": 4,
+        "played": 5,
         "wins": 1
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 3,
         "name": "Mark",
-        "played": 5,
+        "played": 6,
         "wins": 2
       },
       {
@@ -11564,17 +11594,17 @@
         "wins": 0
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 4,
         "name": "Mati",
-        "played": 7,
+        "played": 8,
         "wins": 3
       },
       {
-        "draws": 0,
+        "draws": 1,
         "losses": 2,
         "name": "Milton",
-        "played": 2,
+        "played": 3,
         "wins": 0
       },
       {
@@ -11592,17 +11622,17 @@
         "wins": 2
       },
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 2,
         "name": "Pau",
-        "played": 8,
+        "played": 9,
         "wins": 5
       },
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 1,
         "name": "Pete",
-        "played": 4,
+        "played": 5,
         "wins": 2
       },
       {
@@ -11634,10 +11664,10 @@
         "wins": 2
       },
       {
-        "draws": 1,
+        "draws": 2,
         "losses": 3,
         "name": "Yoann",
-        "played": 9,
+        "played": 10,
         "wins": 5
       }
     ]
@@ -11970,8 +12000,8 @@
         "Pablo",
         "Salsa"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 3,
+      "wins": 2
     },
     {
       "draws": 0,
@@ -12223,8 +12253,8 @@
         "Gus",
         "Salsa"
       ],
-      "played": 3,
-      "wins": 2
+      "played": 4,
+      "wins": 3
     },
     {
       "draws": 1,
@@ -12234,8 +12264,8 @@
         "Gus",
         "Sergio"
       ],
-      "played": 2,
-      "wins": 0
+      "played": 3,
+      "wins": 1
     },
     {
       "draws": 0,
@@ -12245,8 +12275,8 @@
         "Salsa",
         "Sergio"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 3,
+      "wins": 2
     },
     {
       "draws": 0,
@@ -12289,8 +12319,8 @@
         "Salsa",
         "Sergio"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 3,
+      "wins": 2
     },
     {
       "draws": 0,
@@ -12784,8 +12814,8 @@
         "Pablo",
         "Salsa"
       ],
-      "played": 4,
-      "wins": 2
+      "played": 5,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -13279,8 +13309,8 @@
         "Salsa",
         "Sergio"
       ],
-      "played": 3,
-      "wins": 2
+      "played": 4,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -13592,13 +13622,13 @@
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
         "Facu",
         "Gimmi",
         "Ivo"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 3
     },
     {
@@ -14038,8 +14068,8 @@
         "Gus",
         "Pablo"
       ],
-      "played": 3,
-      "wins": 0
+      "played": 4,
+      "wins": 1
     },
     {
       "draws": 2,
@@ -14060,8 +14090,8 @@
         "Pablo",
         "Sergio"
       ],
-      "played": 5,
-      "wins": 1
+      "played": 6,
+      "wins": 2
     },
     {
       "draws": 1,
@@ -14093,8 +14123,8 @@
         "Pablo",
         "Sergio"
       ],
-      "played": 5,
-      "wins": 1
+      "played": 6,
+      "wins": 2
     },
     {
       "draws": 1,
@@ -14208,13 +14238,13 @@
     },
     {
       "draws": 1,
-      "losses": 4,
+      "losses": 5,
       "name": [
         "Facu",
         "Gimmi",
         "Mati"
       ],
-      "played": 9,
+      "played": 10,
       "wins": 4
     },
     {
@@ -14284,14 +14314,14 @@
       "wins": 1
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 2,
       "name": [
         "Gimmi",
         "Mati",
         "Pete"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -14494,13 +14524,13 @@
     },
     {
       "draws": 1,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Mati",
         "Sergio",
         "Yoann"
       ],
-      "played": 6,
+      "played": 7,
       "wins": 3
     },
     {
@@ -14736,13 +14766,13 @@
     },
     {
       "draws": 1,
-      "losses": 0,
+      "losses": 1,
       "name": [
         "Aidan",
         "Ivo",
         "Mati"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 2
     },
     {
@@ -15165,13 +15195,13 @@
     },
     {
       "draws": 1,
-      "losses": 0,
+      "losses": 1,
       "name": [
         "Gimmi",
         "Ivo",
         "Mati"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 2
     },
     {
@@ -17596,24 +17626,24 @@
     },
     {
       "draws": 1,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Aidan",
         "Facu",
         "Gimmi"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
       "draws": 1,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Aidan",
         "Facu",
         "Ivo"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 2
     },
     {
@@ -17629,13 +17659,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Aidan",
         "Gimmi",
         "Ivo"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -17661,14 +17691,14 @@
       "wins": 2
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 2,
       "name": [
         "Aidan",
         "Gimmi",
         "Yoann"
       ],
-      "played": 8,
+      "played": 9,
       "wins": 5
     },
     {
@@ -18552,14 +18582,14 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Aidan",
         "Gimmi",
         "Pete"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -18585,14 +18615,14 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Aidan",
         "Pete",
         "Yoann"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -18618,14 +18648,14 @@
       "wins": 1
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 2,
       "name": [
         "Gimmi",
         "Pete",
         "Yoann"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -19015,13 +19045,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Martin",
         "Mati",
         "Sergio"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 2
     },
     {
@@ -19905,14 +19935,14 @@
       "wins": 3
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 0,
       "name": [
         "Gimmi",
         "Mati",
         "Yoann"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 3
     },
     {
@@ -19928,13 +19958,13 @@
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
         "Martin",
         "Sergio",
         "Yoann"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 2
     },
     {
@@ -21402,13 +21432,13 @@
     },
     {
       "draws": 1,
-      "losses": 6,
+      "losses": 7,
       "name": [
         "Aidan",
         "Facu",
         "Mati"
       ],
-      "played": 10,
+      "played": 11,
       "wins": 3
     },
     {
@@ -21445,14 +21475,14 @@
       "wins": 2
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Aidan",
         "Mati",
         "Pete"
       ],
-      "played": 4,
+      "played": 5,
       "wins": 1
     },
     {
@@ -21820,13 +21850,13 @@
     },
     {
       "draws": 1,
-      "losses": 2,
+      "losses": 3,
       "name": [
         "Facu",
         "Ivo",
         "Mati"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 2
     },
     {
@@ -22519,8 +22549,8 @@
         "Pete",
         "Yoann"
       ],
-      "played": 6,
-      "wins": 2
+      "played": 7,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -25593,13 +25623,13 @@
     },
     {
       "draws": 0,
-      "losses": 4,
+      "losses": 3,
       "name": [
         "Aidan",
         "Dani",
         "Pau"
       ],
-      "played": 7,
+      "played": 6,
       "wins": 3
     },
     {
@@ -25692,13 +25722,13 @@
     },
     {
       "draws": 0,
-      "losses": 4,
+      "losses": 3,
       "name": [
         "Aidan",
         "Pablo",
         "Pau"
       ],
-      "played": 5,
+      "played": 4,
       "wins": 1
     },
     {
@@ -25956,13 +25986,13 @@
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 1,
       "name": [
         "Dani",
         "Pablo",
         "Pau"
       ],
-      "played": 3,
+      "played": 2,
       "wins": 1
     },
     {
@@ -27209,14 +27239,14 @@
       "wins": 4
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 3,
       "name": [
         "Mati",
         "Pete",
         "Yoann"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 0
     },
     {
@@ -27770,14 +27800,14 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Dani",
         "Des",
         "Ivo"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 0
     },
     {
@@ -28705,14 +28735,14 @@
       "wins": 1
     },
     {
-      "draws": 1,
+      "draws": 2,
       "losses": 1,
       "name": [
         "Aidan",
         "Mati",
         "Yoann"
       ],
-      "played": 5,
+      "played": 6,
       "wins": 3
     },
     {
@@ -28734,8 +28764,8 @@
         "Ivo",
         "Pau"
       ],
-      "played": 3,
-      "wins": 2
+      "played": 4,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -28756,8 +28786,8 @@
         "Pau",
         "Yoann"
       ],
-      "played": 4,
-      "wins": 3
+      "played": 5,
+      "wins": 4
     },
     {
       "draws": 0,
@@ -28778,8 +28808,8 @@
         "Pau",
         "Yoann"
       ],
-      "played": 4,
-      "wins": 3
+      "played": 5,
+      "wins": 4
     },
     {
       "draws": 0,
@@ -29284,8 +29314,8 @@
         "Pau",
         "Yoann"
       ],
-      "played": 3,
-      "wins": 1
+      "played": 4,
+      "wins": 2
     },
     {
       "draws": 1,
@@ -29608,13 +29638,13 @@
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 1,
       "name": [
         "Aidan",
         "Facu",
         "Pau"
       ],
-      "played": 3,
+      "played": 2,
       "wins": 1
     },
     {
@@ -30399,14 +30429,14 @@
       "wins": 1
     },
     {
-      "draws": 1,
-      "losses": 2,
+      "draws": 2,
+      "losses": 3,
       "name": [
         "Aidan",
         "Gimmi",
         "Mati"
       ],
-      "played": 4,
+      "played": 6,
       "wins": 1
     },
     {
@@ -31220,8 +31250,8 @@
         "Pau",
         "Pete"
       ],
-      "played": 1,
-      "wins": 0
+      "played": 2,
+      "wins": 1
     },
     {
       "draws": 0,
@@ -31269,13 +31299,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 0,
       "name": [
         "Dani",
         "Facu",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 1
     },
     {
@@ -31566,13 +31596,13 @@
     },
     {
       "draws": 1,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Milton",
         "Sergio",
         "Yoann"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 0
     },
     {
@@ -32232,8 +32262,8 @@
         "Pau",
         "Pete"
       ],
-      "played": 2,
-      "wins": 0
+      "played": 3,
+      "wins": 1
     },
     {
       "draws": 0,
@@ -32346,25 +32376,25 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Aidan",
         "Gimmi",
         "Mark"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 1,
       "name": [
         "Aidan",
         "Gimmi",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 0
     },
     {
@@ -32379,14 +32409,14 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Aidan",
         "Mark",
         "Pete"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -32445,14 +32475,14 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Gimmi",
         "Mark",
         "Pete"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -32551,8 +32581,8 @@
         "Niyi",
         "Pau"
       ],
-      "played": 3,
-      "wins": 3
+      "played": 4,
+      "wins": 4
     },
     {
       "draws": 0,
@@ -32599,14 +32629,14 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Gimmi",
         "Mark",
         "Yoann"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 0
     },
     {
@@ -33633,14 +33663,14 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 1,
       "name": [
         "Ivo",
         "Milton",
         "Pau"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 0
     },
     {
@@ -33996,14 +34026,14 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Dani",
         "Ivo",
         "Milton"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 1
     },
     {
@@ -34366,8 +34396,8 @@
         "Niyi",
         "Pau"
       ],
-      "played": 2,
-      "wins": 2
+      "played": 3,
+      "wins": 3
     },
     {
       "draws": 0,
@@ -34954,13 +34984,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 0,
       "name": [
         "Dani",
         "Gimmi",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 1
     },
     {
@@ -35114,8 +35144,8 @@
         "Pau",
         "Pete"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 3,
+      "wins": 2
     },
     {
       "draws": 0,
@@ -35162,14 +35192,14 @@
       "wins": 1
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 0,
       "name": [
         "Dani",
         "Ivo",
         "Pau"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 1
     },
     {
@@ -35756,14 +35786,14 @@
       "wins": 0
     },
     {
-      "draws": 0,
+      "draws": 1,
       "losses": 2,
       "name": [
         "Dani",
         "Mario",
         "Milton"
       ],
-      "played": 3,
+      "played": 4,
       "wins": 1
     },
     {
@@ -36218,6 +36248,237 @@
       "wins": 0
     },
     {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Dani",
+        "Des",
+        "Mario"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Dani",
+        "Des",
+        "Milton"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Dani",
+        "Des",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 1,
+      "name": [
+        "Dani",
+        "Ivo",
+        "Mario"
+      ],
+      "played": 3,
+      "wins": 1
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Dani",
+        "Mario",
+        "Pau"
+      ],
+      "played": 2,
+      "wins": 1
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Dani",
+        "Milton",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Ivo",
+        "Mario"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Ivo",
+        "Milton"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Ivo",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Mario",
+        "Milton"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Mario",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Des",
+        "Milton",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 1,
+      "name": [
+        "Ivo",
+        "Mario",
+        "Milton"
+      ],
+      "played": 2,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Ivo",
+        "Mario",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Mario",
+        "Milton",
+        "Pau"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Aidan",
+        "Mark",
+        "Mati"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Aidan",
+        "Mark",
+        "Yoann"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Gimmi",
+        "Mark",
+        "Mati"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Mark",
+        "Mati",
+        "Pete"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 1,
+      "name": [
+        "Mark",
+        "Mati",
+        "Yoann"
+      ],
+      "played": 2,
+      "wins": 0
+    },
+    {
+      "draws": 1,
+      "losses": 0,
+      "name": [
+        "Mark",
+        "Pete",
+        "Yoann"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
       "draws": 0,
       "losses": 0,
       "name": [
@@ -36452,17 +36713,6 @@
       "draws": 0,
       "losses": 0,
       "name": [
-        "Dani",
-        "Mario",
-        "Pau"
-      ],
-      "played": 1,
-      "wins": 1
-    },
-    {
-      "draws": 0,
-      "losses": 0,
-      "name": [
         "Gus",
         "Mario",
         "Niyi"
@@ -36637,13 +36887,13 @@
     },
     {
       "draws": 1,
-      "losses": 1,
+      "losses": 0,
       "name": [
         "Gimmi",
         "Pablo",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 0
     },
     {
@@ -36879,13 +37129,13 @@
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 1,
       "name": [
         "Facu",
         "Gimmi",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 0
     },
     {
@@ -37473,13 +37723,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Aidan",
         "Facu",
         "Sergio Pérez"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -37495,13 +37745,13 @@
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
         "Aidan",
         "Pablo",
         "Sergio Pérez"
       ],
-      "played": 1,
+      "played": 2,
       "wins": 1
     },
     {
@@ -37550,13 +37800,13 @@
     },
     {
       "draws": 0,
-      "losses": 1,
+      "losses": 2,
       "name": [
         "Facu",
         "Pablo",
         "Sergio Pérez"
       ],
-      "played": 2,
+      "played": 3,
       "wins": 1
     },
     {
@@ -37622,8 +37872,8 @@
         "Ivo",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -37644,8 +37894,8 @@
         "Pete",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -37666,8 +37916,8 @@
         "Pete",
         "Sergio Pérez"
       ],
-      "played": 2,
-      "wins": 1
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -37792,17 +38042,6 @@
     },
     {
       "draws": 0,
-      "losses": 1,
-      "name": [
-        "Dani",
-        "Ivo",
-        "Mario"
-      ],
-      "played": 2,
-      "wins": 1
-    },
-    {
-      "draws": 0,
       "losses": 0,
       "name": [
         "Dani",
@@ -38276,13 +38515,13 @@
     },
     {
       "draws": 0,
-      "losses": 2,
+      "losses": 1,
       "name": [
         "Facu",
         "Pablo",
         "Pau"
       ],
-      "played": 2,
+      "played": 1,
       "wins": 0
     },
     {
@@ -38408,80 +38647,80 @@
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
-        "Gus",
-        "Niyi",
+        "Aidan",
+        "Dani",
         "Sergio Pérez"
       ],
       "played": 1,
-      "wins": 1
+      "wins": 0
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
-        "Gus",
-        "Sergio Pérez",
-        "Yoann"
-      ],
-      "played": 1,
-      "wins": 1
-    },
-    {
-      "draws": 0,
-      "losses": 0,
-      "name": [
-        "Ivo",
-        "Niyi",
+        "Aidan",
+        "Gimmi",
         "Sergio Pérez"
       ],
       "played": 1,
-      "wins": 1
+      "wins": 0
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
-        "Ivo",
-        "Sergio Pérez",
-        "Yoann"
-      ],
-      "played": 1,
-      "wins": 1
-    },
-    {
-      "draws": 0,
-      "losses": 0,
-      "name": [
-        "Niyi",
-        "Pete",
+        "Dani",
+        "Facu",
         "Sergio Pérez"
       ],
       "played": 1,
-      "wins": 1
+      "wins": 0
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
-        "Niyi",
-        "Sergio Pérez",
-        "Yoann"
+        "Dani",
+        "Gimmi",
+        "Sergio Pérez"
       ],
       "played": 1,
-      "wins": 1
+      "wins": 0
     },
     {
       "draws": 0,
-      "losses": 0,
+      "losses": 1,
       "name": [
-        "Pete",
-        "Sergio Pérez",
-        "Yoann"
+        "Dani",
+        "Pablo",
+        "Sergio Pérez"
       ],
       "played": 1,
-      "wins": 1
+      "wins": 0
+    },
+    {
+      "draws": 0,
+      "losses": 1,
+      "name": [
+        "Facu",
+        "Gimmi",
+        "Sergio Pérez"
+      ],
+      "played": 1,
+      "wins": 0
+    },
+    {
+      "draws": 0,
+      "losses": 1,
+      "name": [
+        "Gimmi",
+        "Pablo",
+        "Sergio Pérez"
+      ],
+      "played": 1,
+      "wins": 0
     },
     {
       "draws": 0,
@@ -38490,17 +38729,6 @@
         "Dani",
         "Mario",
         "Pete"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Ivo",
-        "Mario",
-        "Milton"
       ],
       "played": 1,
       "wins": 0
@@ -38807,30 +39035,8 @@
       "losses": 1,
       "name": [
         "Martin",
-        "Mati",
-        "Sergio Pérez"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Martin",
         "Milton",
-        "Sergio Pérez"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Martin",
-        "Sergio Pérez",
-        "Yoann"
+        "Sergio"
       ],
       "played": 1,
       "wins": 0
@@ -38841,7 +39047,7 @@
       "name": [
         "Mati",
         "Milton",
-        "Sergio Pérez"
+        "Sergio"
       ],
       "played": 1,
       "wins": 0
@@ -38855,28 +39061,6 @@
         "Yoann"
       ],
       "played": 2,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Mati",
-        "Sergio Pérez",
-        "Yoann"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Milton",
-        "Sergio Pérez",
-        "Yoann"
-      ],
-      "played": 1,
       "wins": 0
     },
     {
@@ -38963,17 +39147,6 @@
         "Mark",
         "Mati",
         "Milton"
-      ],
-      "played": 1,
-      "wins": 0
-    },
-    {
-      "draws": 0,
-      "losses": 1,
-      "name": [
-        "Mark",
-        "Mati",
-        "Yoann"
       ],
       "played": 1,
       "wins": 0
