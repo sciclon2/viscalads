@@ -1,6 +1,6 @@
 # NKOS Lab
 
-Interfaz local para consultar el historial reconstruido de partidos.
+Interfaz local para consultar el historial reconstruido de partidos de Sarrià y Bogatell sin mezclar sus estadísticas. La portada permite elegir la competición antes de entrar al dashboard.
 
 Consultas incluidas: armador de equipos, forma actual, ranking por efectividad, tabla de puntos, porcentaje de derrotas, compañeros, rivales y némesis, duplas, ternas, rendimiento por torneo, prime por bloques, historial de partidos, récords, cobertura y palmarés.
 
@@ -26,8 +26,10 @@ Los CSV históricos fueron retirados. No existe ningún flujo de reconstrucción
 ## Agregar consultas
 
 1. Registrar nombre, descripción y filtros en `lib/query-catalog.ts`.
-2. Añadir el adaptador de datos en `app/page.tsx`.
+2. Añadir el adaptador de datos en `components/stats-dashboard.tsx`.
 3. Si hacen falta datos derivados nuevos, extender `scripts/build-data.py`.
+
+`app/page.tsx` es la entrada y portada: valida la competición solicitada y monta el dashboard correspondiente. La lógica interactiva de estadísticas vive en `components/stats-dashboard.tsx`.
 
 El generador excluye el evento multiequipo de los cálculos de duplas y ternas, ya que sus participantes no forman dos equipos comparables.
 

@@ -1,8 +1,10 @@
 # Viscalads
 
-Viscalads is a local-first football history and statistics project reconstructed from the New Kids on Sarrià WhatsApp group. SQLite is the operational source of truth; the web dataset, Excel workbook and Word register are derived outputs.
+Viscalads is a local-first football history, statistics and balanced-team project reconstructed from football-group records. It currently keeps Sarrià (Wednesdays) and Bogatell (Saturdays) as separate competitions while sharing one global player identity. SQLite is the operational source of truth; the web dataset, Excel workbook and Word register are derived outputs.
 
-The repository is private by design. Original WhatsApp exports, photos, videos and OCR scratch files must never be committed.
+The repository is private by design. Original WhatsApp exports, private media and OCR scratch files must never be committed. Curated competition and player images used by the interface live under `web-stats/public/` and may be versioned deliberately.
+
+Current release: [`v1.0.0-alpha.1`](https://github.com/sciclon2/viscalads/releases/tag/v1.0.0-alpha.1). It is a pre-release: the data model and generated outputs are validated, but the product is still evolving.
 
 ## Architecture
 
@@ -22,7 +24,8 @@ Core boundaries:
 - `src/sciclon2/repositories/`: SQL access; UI and exporters do not issue SQL.
 - `src/sciclon2/services/`: statistics, validation and export payloads.
 - `tests/`: database and business-rule regression tests.
-- `web-stats/`: the existing local interface. Its JSON is generated, not edited.
+- `web-stats/`: local interface, competition landing page, statistics and balanced-team builder. Its JSON is generated, not edited.
+- `scripts/`: controlled one-time importers for reconstructed data and curated player photos.
 
 Data is organized as `competitions → tournaments → matches`. A competition is
 the recurring group or venue (for example, Sarrià on Wednesdays or Bogatell on
@@ -63,6 +66,19 @@ pnpm dev
 
 Then open `http://localhost:3000`.
 
+The landing page presents the two competitions. Selecting Sarrià or Bogatell opens only that competition's dashboard. The header selector can switch between them, and **Inicio** returns to the landing page.
+
+## Web features
+
+- Individual ranking by points, effectiveness, wins, losses and matches played.
+- Minimum and maximum appearance filters.
+- Current form over recent matches and an activity window.
+- Decisive-player and collective-jinx comparisons.
+- Teammate, rival, pair and trio analysis.
+- Tournament performance, player prime, match history, records, coverage and honours.
+- Balanced-team builder using player form and primary/secondary positions.
+- Local player photos with initials as the fallback.
+
 ## Data rules
 
 - A player has one immutable numeric ID and one canonical display name.
@@ -88,6 +104,8 @@ viscalads export-web
 
 Never edit `web-stats/lib/stats-data.json` manually.
 
+The scripts under `scripts/` are migration/import utilities, not the routine entry point for new matches. Run them only against an intentional backup or disposable copy unless their effect has been reviewed.
+
 ## Tests
 
 ```bash
@@ -95,6 +113,12 @@ python -m unittest discover -s tests -v
 ```
 
 The tests create temporary databases and do not alter the real history.
+
+The alpha release baseline contains 12 automated database and business-rule tests. A production web build can be checked with:
+
+```bash
+pnpm --dir web-stats build
+```
 
 ## Backups and versioning
 
