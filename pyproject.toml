@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "viscalads"
-version = "0.1.0"
+version = "1.0.0a1"
 description = "Local-first football match history, statistics and balanced team tools."
 readme = "README.md"
 requires-python = ">=3.11"

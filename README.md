@@ -24,6 +24,16 @@ Core boundaries:
 - `tests/`: database and business-rule regression tests.
 - `web-stats/`: the existing local interface. Its JSON is generated, not edited.
 
+Data is organized as `competitions → tournaments → matches`. A competition is
+the recurring group or venue (for example, Sarrià on Wednesdays or Bogatell on
+Saturdays); tournaments are its individual editions. Every tournament belongs
+to one competition so histories and statistics can be filtered independently.
+
+Players have one global identity in `players`. The `competition_players` join
+table records whether that player participates in Sarrià, Bogatell, or both;
+this prevents duplicate people while keeping each competition's matches and
+statistics isolated.
+
 ## First setup
 
 Python has no runtime dependencies outside the standard library.
@@ -56,6 +66,8 @@ Then open `http://localhost:3000`.
 ## Data rules
 
 - A player has one immutable numeric ID and one canonical display name.
+- Player photos are local public assets referenced by `players.photo_path`; an empty value deliberately falls back to initials.
+- A tournament must belong to a competition; matches inherit that competition through their tournament.
 - Alternate spellings belong in `player_aliases`; they never create another player.
 - Participation is one row per player and match in `match_players`.
 - A verified match requires two non-empty teams and a known win/draw/loss outcome.

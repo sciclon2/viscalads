@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'NKOS Lab — Estadísticas',
-  description: 'Consultas locales sobre el historial de New Kids on Sarrià.',
+  title: 'Viscalads — Estadísticas de fútbol',
+  description: 'Historial y estadísticas de los partidos de Sarrià y Bogatell.',
 };
 
 export default function RootLayout({

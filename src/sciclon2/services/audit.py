@@ -9,6 +9,11 @@ from .statistics import build_statistics
 def audit(connection: sqlite3.Connection, expected_matches: int | None = None) -> list[str]:
     errors: list[str] = []
     games = matches(connection)
+    unassigned = connection.execute(
+        "SELECT COUNT(*) FROM tournaments WHERE competition_id IS NULL"
+    ).fetchone()[0]
+    if unassigned:
+        errors.append(f"{unassigned} tournaments have no competition")
     if expected_matches is not None and len(games) != expected_matches:
         errors.append(f"expected {expected_matches} matches, found {len(games)}")
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
@@ -17,6 +22,14 @@ def audit(connection: sqlite3.Connection, expected_matches: int | None = None) -
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
     if foreign_keys:
         errors.append(f"foreign key violations: {len(foreign_keys)}")
+    missing_memberships = connection.execute(
+        "SELECT COUNT(*) FROM match_players mp "
+        "JOIN matches m ON m.id=mp.match_id JOIN tournaments t ON t.id=m.tournament_id "
+        "LEFT JOIN competition_players cp ON cp.competition_id=t.competition_id AND cp.player_id=mp.player_id "
+        "WHERE cp.player_id IS NULL"
+    ).fetchone()[0]
+    if missing_memberships:
+        errors.append(f"{missing_memberships} match players have no competition membership")
     for game in games:
         label = f"match {game['id']} ({game['played_on']})"
         if len(game["team1"]) != len(set(game["team1"])) or len(game["team2"]) != len(set(game["team2"])):
@@ -38,4 +51,3 @@ def audit(connection: sqlite3.Connection, expected_matches: int | None = None) -
         if player["played"] != player["wins"] + player["draws"] + player["losses"]:
             errors.append(f"player totals disagree: {player['name']}")
     return errors
-

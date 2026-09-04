@@ -23,7 +23,7 @@ class DatabaseTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_database_audit(self):
-        self.assertEqual([], audit(self.connection, expected_matches=126))
+        self.assertEqual([], audit(self.connection, expected_matches=177))
 
     def test_2026_external_reconciliation(self):
         march = self.connection.execute(
@@ -71,6 +71,59 @@ class DatabaseTests(unittest.TestCase):
         match_count = self.connection.execute("SELECT count(*) FROM matches").fetchone()[0]
         self.assertEqual(match_count, len(payload["games"]))
         self.assertEqual("data/sciclon2.sqlite3", payload["generatedFrom"])
+        self.assertEqual(["sarria", "bogatell"], [item["slug"] for item in payload["competitions"]])
+        self.assertEqual(126, len(payload["competitionStats"]["sarria"]["games"]))
+        self.assertEqual(51, len(payload["competitionStats"]["bogatell"]["games"]))
+
+    def test_competition_histories_are_isolated(self):
+        counts = dict(self.connection.execute(
+            "SELECT c.slug, COUNT(m.id) FROM competitions c "
+            "LEFT JOIN tournaments t ON t.competition_id=c.id "
+            "LEFT JOIN matches m ON m.tournament_id=t.id GROUP BY c.slug"
+        ).fetchall())
+        self.assertEqual({"sarria": 126, "bogatell": 51}, counts)
+        wrong_weekday = self.connection.execute(
+            "SELECT m.played_on FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+            "JOIN competitions c ON c.id=t.competition_id "
+            "WHERE c.slug='bogatell' AND strftime('%w', m.played_on) != '6'"
+        ).fetchall()
+        self.assertEqual([], wrong_weekday)
+
+    def test_every_tournament_belongs_to_a_competition(self):
+        missing = self.connection.execute(
+            "SELECT code FROM tournaments WHERE competition_id IS NULL"
+        ).fetchall()
+        self.assertEqual([], missing)
+
+    def test_players_are_global_and_memberships_are_scoped(self):
+        duplicate_names = self.connection.execute(
+            "SELECT canonical_name FROM players GROUP BY canonical_name COLLATE NOCASE HAVING COUNT(*) > 1"
+        ).fetchall()
+        self.assertEqual([], duplicate_names)
+        invalid = self.connection.execute(
+            "SELECT cp.player_id FROM competition_players cp "
+            "LEFT JOIN players p ON p.id=cp.player_id "
+            "LEFT JOIN competitions c ON c.id=cp.competition_id "
+            "WHERE p.id IS NULL OR c.id IS NULL"
+        ).fetchall()
+        self.assertEqual([], invalid)
+        self.assertGreater(
+            self.connection.execute(
+                "SELECT COUNT(*) FROM competition_players cp "
+                "JOIN competitions c ON c.id=cp.competition_id WHERE c.slug='sarria'"
+            ).fetchone()[0],
+            0,
+        )
+
+    def test_profiles_expose_competition_memberships(self):
+        payload = web_payload(self.connection)
+        self.assertTrue(all("competitions" in profile for profile in payload["profiles"]))
+        self.assertTrue(any("sarria" in profile["competitions"] for profile in payload["profiles"]))
+
+    def test_player_photos_are_local_or_empty(self):
+        payload = web_payload(self.connection)
+        for profile in payload["profiles"]:
+            self.assertTrue(not profile["photo"] or profile["photo"].startswith("/players/"))
 
     def test_all_player_totals_balance(self):
         for player in web_payload(self.connection)["players"]:

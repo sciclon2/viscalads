@@ -29,7 +29,7 @@ def main() -> None:
     if args.command == "init":
         print(f"Database ready: {args.db} ({len(applied)} migrations applied)")
     elif args.command == "audit":
-        errors = audit(connection, expected_matches=126)
+        errors = audit(connection)
         if errors:
             for error in errors:
                 print(f"ERROR: {error}")

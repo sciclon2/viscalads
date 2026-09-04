@@ -15,7 +15,7 @@ from sciclon2.services.export import write_web_payload
 def main() -> None:
     connection = connect(DEFAULT_DB)
     migrate(connection)
-    errors = audit(connection, expected_matches=124)
+    errors = audit(connection)
     if errors:
         raise SystemExit("Database audit failed:\n" + "\n".join(errors))
     write_web_payload(connection, WEB_EXPORT)
