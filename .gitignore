@@ -1,0 +1,25 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# SQLite sidecars are runtime-only. The database itself is authoritative.
+data/*.sqlite3-*
+web-stats/lib/stats-data.json
+outputs/
+
+# Original private WhatsApp material and analysis scratch files
+*.zip
+work/*
+
+# Frontend dependencies and build output
+web-stats/node_modules/
+web-stats/.vinext/
+web-stats/dist/
+web-stats/.next/
+
+# Local launch helpers and generated inspection files
+web-stats/*.command
+*.inspect.ndjson
