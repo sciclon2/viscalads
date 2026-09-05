@@ -8,6 +8,7 @@ from sciclon2.config import DEFAULT_DB
 from sciclon2.db import connect
 from sciclon2.services.audit import audit
 from sciclon2.services.export import web_payload
+from sciclon2.services.match_entry import recent_lineups, save_lineup, save_match, void_match
 
 
 class DatabaseTests(unittest.TestCase):
@@ -165,6 +166,37 @@ class DatabaseTests(unittest.TestCase):
 
     def test_foreign_keys_are_enabled(self):
         self.assertEqual(1, self.connection.execute("PRAGMA foreign_keys").fetchone()[0])
+
+    def test_recent_lineups_keep_only_five(self):
+        player_ids = [row[0] for row in self.connection.execute(
+            "SELECT p.id FROM players p JOIN competition_players cp ON cp.player_id=p.id "
+            "JOIN competitions c ON c.id=cp.competition_id WHERE c.slug='bogatell' LIMIT 8"
+        )]
+        for _ in range(6):
+            save_lineup(self.connection, "bogatell", [player_ids[:4], player_ids[4:]])
+        self.assertEqual(5, len(recent_lineups(self.connection, "bogatell")))
+
+    def test_manual_match_guests_goals_and_voiding(self):
+        players = self.connection.execute(
+            "SELECT p.id FROM players p JOIN competition_players cp ON cp.player_id=p.id "
+            "JOIN competitions c ON c.id=cp.competition_id WHERE c.slug='bogatell' LIMIT 2"
+        ).fetchall()
+        match_id = save_match(self.connection, {
+            "competition": "bogatell", "playedOn": "2030-01-05",
+            "teams": [[{"playerId": players[0][0]}, {"guestName": "Invitado 1"}],
+                      [{"playerId": players[1][0]}]],
+            "goals": [{"teamNo": 1, "guestName": "Invitado 1", "count": 2},
+                      {"teamNo": 2, "count": 1}],
+        })
+        row = self.connection.execute(
+            "SELECT score_team1, score_team2, outcome FROM matches WHERE id=?", (match_id,)
+        ).fetchone()
+        self.assertEqual((2, 1, "1"), tuple(row))
+        self.assertEqual(1, self.connection.execute(
+            "SELECT COUNT(*) FROM match_guests WHERE match_id=?", (match_id,)
+        ).fetchone()[0])
+        void_match(self.connection, match_id, "prueba")
+        self.assertFalse(any(game["id"] == match_id for game in web_payload(self.connection)["games"]))
 
 
 if __name__ == "__main__":

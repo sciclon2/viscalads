@@ -8,7 +8,8 @@ def matches(connection: sqlite3.Connection) -> list[dict]:
         "SELECT m.*, t.code AS tournament, c.slug AS competition, "
         "c.display_name AS competition_name FROM matches m "
         "LEFT JOIN tournaments t ON t.id=m.tournament_id "
-        "LEFT JOIN competitions c ON c.id=t.competition_id ORDER BY m.played_on, m.id"
+        "LEFT JOIN competitions c ON c.id=t.competition_id "
+        "WHERE m.voided_at IS NULL ORDER BY m.played_on, m.id"
     ).fetchall()
     result = []
     for row in base:
@@ -21,6 +22,18 @@ def matches(connection: sqlite3.Connection) -> list[dict]:
         ).fetchall()
         game["team1"] = [p["canonical_name"] for p in players if p["team_no"] == 1]
         game["team2"] = [p["canonical_name"] for p in players if p["team_no"] == 2]
+        guests = connection.execute(
+            "SELECT guest_label, team_no FROM match_guests WHERE match_id=? "
+            "ORDER BY team_no, lineup_order", (row["id"],)
+        ).fetchall()
+        game["guests"] = [dict(guest) for guest in guests]
+        game["goals"] = [dict(goal) for goal in connection.execute(
+            "SELECT mg.team_no, mg.goal_count, p.canonical_name AS player_name, "
+            "g.guest_label FROM match_goals mg "
+            "LEFT JOIN players p ON p.id=mg.player_id "
+            "LEFT JOIN match_guests g ON g.id=mg.guest_id "
+            "WHERE mg.match_id=? ORDER BY mg.team_no, mg.id", (row["id"],)
+        ).fetchall()]
         result.append(game)
     return result
 
@@ -37,7 +50,7 @@ def profiles(connection: sqlite3.Connection) -> list[dict]:
     grouped: dict[int, dict] = {}
     for row in rows:
         profile = grouped.setdefault(row["id"], {
-            "name": row["canonical_name"], "active": bool(row["active"]),
+            "id": row["id"], "name": row["canonical_name"], "active": bool(row["active"]),
             "notes": row["notes"], "photo": row["photo_path"] or "", "positions": [],
             "first_name": row["first_name"] or "", "last_name": row["last_name"] or "",
             "nickname": row["nickname"] or "", "birth_date": row["birth_date"] or "",
@@ -76,7 +89,8 @@ def competitions(connection: sqlite3.Connection) -> list[dict]:
         "SELECT c.slug, c.display_name, c.usual_weekday, c.venue, c.active, "
         "COUNT(DISTINCT t.id) AS tournament_count, COUNT(DISTINCT m.id) AS match_count "
         "FROM competitions c LEFT JOIN tournaments t ON t.competition_id=c.id "
-        "LEFT JOIN matches m ON m.tournament_id=t.id GROUP BY c.id ORDER BY c.id"
+        "LEFT JOIN matches m ON m.tournament_id=t.id AND m.voided_at IS NULL "
+        "GROUP BY c.id ORDER BY c.id"
     ).fetchall()
     return [dict(row) for row in rows]
 

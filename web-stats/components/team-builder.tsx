@@ -2,13 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { GripVertical, RefreshCw, Users, X } from 'lucide-react';
-import data from '@/lib/stats-data.json';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlayerAvatar } from '@/components/player-avatar';
+import { useStatsData, type Game, type Profile } from '@/lib/stats-context';
+import { API } from '@/components/site-client';
 
-type Profile = (typeof data.profiles)[number];
-type Game = (typeof data.games)[number];
 type Player = Profile & { form: number; played: number; lastDate: string };
 type Role = 'DEF' | 'MED' | 'DEL';
 type Formation = {
@@ -176,7 +175,8 @@ function splitTeams(players: Player[]): TeamPair {
   return best!;
 }
 
-export function TeamBuilder({ games = data.games }: { games?: Game[] }) {
+export function TeamBuilder({ games, competition }: { games: Game[]; competition: string }) {
+  const data = useStatsData();
   const validGames = useMemo(
     () =>
       games
@@ -239,8 +239,17 @@ export function TeamBuilder({ games = data.games }: { games?: Game[] }) {
       setMessage('La cantidad debe ser par para formar equipos iguales.');
       return;
     }
-    setTeams(splitTeams(selectedPlayers));
+    const result = splitTeams(selectedPlayers);
+    setTeams(result);
     setMessage('');
+    void fetch(`${API}/lineups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        competition,
+        teams: [result.a.map((item) => item.id), result.b.map((item) => item.id)],
+      }),
+    });
   };
   const average = (team: Player[]) =>
     team.reduce((n, p) => n + p.form, 0) / team.length;

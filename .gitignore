@@ -8,6 +8,7 @@ __pycache__/
 # SQLite sidecars are runtime-only. The database itself is authoritative.
 data/*.sqlite3-*
 web-stats/lib/stats-data.json
+*.tsbuildinfo
 outputs/
 
 # Original private WhatsApp material and analysis scratch files

@@ -1,11 +1,8 @@
 'use client';
 
-import data from '@/lib/stats-data.json';
 import { cn } from '@/lib/utils';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-
-const photoByName = new Map(data.profiles.map((profile) => [profile.name, profile.photo]));
-const profileByName = new Map(data.profiles.map((profile) => [profile.name, profile]));
+import { useStatsData } from '@/lib/stats-context';
 
 function displayDate(value: string) {
   if (!value) return 'Pendiente';
@@ -14,6 +11,8 @@ function displayDate(value: string) {
 }
 
 function ProfileDetails({ name }: { name: string }) {
+  const { profiles } = useStatsData();
+  const profileByName = new Map(profiles.map((profile) => [profile.name, profile]));
   const profile = profileByName.get(name);
   return (
     <>
@@ -34,6 +33,8 @@ function ProfileDetails({ name }: { name: string }) {
 }
 
 export function PlayerName({ name, className }: { name: string; className?: string }) {
+  const { profiles } = useStatsData();
+  const profileByName = new Map(profiles.map((profile) => [profile.name, profile]));
   if (!profileByName.has(name)) return <span className={className}>{name}</span>;
   return (
     <HoverCard>
@@ -52,6 +53,8 @@ export function PlayerName({ name, className }: { name: string; className?: stri
 }
 
 export function PlayerAvatar({ name, className }: { name: string; className?: string }) {
+  const { profiles } = useStatsData();
+  const photoByName = new Map(profiles.map((profile) => [profile.name, profile.photo]));
   const photo = photoByName.get(name);
   const initials = name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   return (

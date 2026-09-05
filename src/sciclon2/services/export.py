@@ -11,12 +11,13 @@ from .statistics import build_statistics
 def web_payload(connection: sqlite3.Connection) -> dict:
     database_games = matches(connection)
     public_games = [{
-        "date": g["played_on"], "tournament": g["tournament"],
+        "id": g["id"], "date": g["played_on"], "tournament": g["tournament"],
         "competition": g["competition"], "competitionName": g["competition_name"],
         "team1": g["team1"], "team2": g["team2"],
         "score1": g["score_team1"], "score2": g["score_team2"],
         "outcome": g["outcome"], "quality": g["result_quality"],
         "status": g["coverage_status"], "evidence": g["evidence_summary"],
+        "notes": g["notes"], "guests": g["guests"], "goals": g["goals"],
     } for g in database_games]
     stats = build_statistics(database_games)
     competition_rows = competitions(connection)
@@ -43,7 +44,7 @@ def web_payload(connection: sqlite3.Connection) -> dict:
         "games": public_games,
         "players": stats["players"],
         "profiles": [{
-            "name": p["name"],
+            "id": p["id"], "name": p["name"],
             "primary": p["positions"][0] if p["positions"] else "",
             "alternate": p["positions"][1] if len(p["positions"]) > 1 else "",
             "notes": p["notes"], "active": p["active"], "photo": p["photo"],

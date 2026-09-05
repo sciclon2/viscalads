@@ -1,12 +1,14 @@
 {
   "name": "sites-project",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-beta.1",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "python3 ../scripts/dev.py",
+    "dev:web": "vinext dev",
+    "api": "python3 ../scripts/serve_api.py",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",

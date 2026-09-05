@@ -3,20 +3,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  ClipboardPlus,
   Crown,
   Clock,
   ExternalLink,
   Home,
   Images,
   Info,
+  ListChecks,
   MapPin,
   Minus,
   Phone,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import data from '@/lib/stats-data.json';
 import { queryCatalog as queries, type QueryId } from '@/lib/query-catalog';
+import type { Game, StatsData, Venue } from '@/lib/stats-context';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -35,6 +37,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { TeamBuilder } from '@/components/team-builder';
+import { MatchEntry } from '@/components/match-entry';
 import { PlayerAvatar, PlayerName } from '@/components/player-avatar';
 import {
   Dialog,
@@ -66,9 +69,7 @@ type FormRow = RecordRow & {
   lastDate: string;
 };
 type Metric = 'effectiveness' | 'played' | 'wins' | 'losses' | 'points';
-type Game = (typeof data.games)[number];
-type Venue = (typeof data.venues)[number];
-type CompetitionId = keyof typeof data.competitionStats;
+type CompetitionId = string;
 const metricLabels: Record<Metric, string> = {
   effectiveness: 'Efectividad',
   played: 'Partidos',
@@ -119,10 +120,15 @@ function resultFor(game: Game, player: string) {
 
 export default function StatsDashboard({
   initialCompetition,
+  data,
+  onDataChanged,
 }: {
   initialCompetition: CompetitionId;
+  data: StatsData;
+  onDataChanged: () => Promise<void>;
 }) {
   const [competition, setCompetition] = useState<CompetitionId>(initialCompetition);
+  const [workspace, setWorkspace] = useState<'stats' | 'create' | 'admin'>('stats');
   const [query, setQuery] = useState<QueryId>('players');
   const [player, setPlayer] = useState('Facu');
   const [minimum, setMinimum] = useState(20);
@@ -270,6 +276,7 @@ export default function StatsDashboard({
               <button
                 type="button"
                 onClick={() => {
+                  setWorkspace('stats');
                   setQuery('venues');
                   window.requestAnimationFrame(() =>
                     document.getElementById('stats-panel')?.scrollIntoView({
@@ -284,11 +291,29 @@ export default function StatsDashboard({
                 <MapPin className="size-4" />
                 <span>Canchas</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setWorkspace('create')}
+                className="header-home"
+                aria-label="Cargar partido"
+              >
+                <ClipboardPlus className="size-4" />
+                <span>Cargar partido</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspace('admin')}
+                className="header-home"
+                aria-label="Administrar partidos"
+              >
+                <ListChecks className="size-4" />
+                <span>Partidos</span>
+              </button>
               <select
                 aria-label="Competición"
                 value={competition}
                 onChange={(event) =>
-                  setCompetition(event.target.value as CompetitionId)
+                  { setCompetition(event.target.value as CompetitionId); void onDataChanged(); }
                 }
                 className="h-10 min-w-40 rounded-md border border-white/20 bg-[#25362e] px-3 text-sm text-white"
               >
@@ -336,18 +361,20 @@ export default function StatsDashboard({
               <div>
                 <div className="flex items-center gap-2">
                   <CardTitle className="font-display text-2xl">
-                    {selected.label}
+                    {workspace === 'create' ? 'Cargar partido' : workspace === 'admin' ? 'Administrar partidos' : selected.label}
                   </CardTitle>
-                  <details className="info-details">
+                  {workspace === 'stats' && <details className="info-details">
                     <summary aria-label={`Cómo se calcula ${selected.label}`}>
                       <Info className="size-4" />
                     </summary>
                     <div>{selected.details}</div>
-                  </details>
+                  </details>}
                 </div>
-                <CardDescription>{selected.description}</CardDescription>
+                <CardDescription>{workspace === 'create' ? 'Ingresá un partido nuevo manualmente o partí de una de las últimas cinco formaciones.' : workspace === 'admin' ? 'Corregí o anulá partidos ya guardados.' : selected.description}</CardDescription>
               </div>
-              {query === 'venues' ? (
+              {workspace !== 'stats' ? (
+                <button type="button" onClick={() => setWorkspace('stats')} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"><ArrowLeft className="size-4"/>Volver a estadísticas</button>
+              ) : query === 'venues' ? (
                 <button
                   type="button"
                   onClick={() => setQuery('players')}
@@ -359,7 +386,7 @@ export default function StatsDashboard({
               ) : (
                 <select
                   value={query}
-                  onChange={(event) => setQuery(event.target.value as QueryId)}
+                  onChange={(event) => { setQuery(event.target.value as QueryId); void onDataChanged(); }}
                   className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
                 >
                   {queries.filter((item) => item.id !== 'venues').map((item) => (
@@ -369,6 +396,9 @@ export default function StatsDashboard({
               )}
             </CardHeader>
             <CardContent className="pt-5">
+              {workspace !== 'stats' ? (
+                <MatchEntry mode={workspace} competition={competition} profiles={data.profiles} games={games} onSaved={onDataChanged} />
+              ) : <>
               <div className="mb-5 flex flex-wrap items-end gap-3">
                 {selected.needsPlayer && (
                   <Filter label="Jugador">
@@ -472,7 +502,7 @@ export default function StatsDashboard({
               {games.length === 0 ? (
                 <EmptyCompetition />
               ) : query === 'builder' ? (
-                <TeamBuilder games={games} />
+                <TeamBuilder games={games} competition={competition} />
               ) : query === 'venues' ? (
                 <Venues venues={scope.venues as Venue[]} />
               ) : query === 'champions' ? (
@@ -496,6 +526,7 @@ export default function StatsDashboard({
                   lossMetric={query === 'losses'}
                 />
               )}
+              </>}
             </CardContent>
           </Card>
           <p className="mt-4 text-center text-sm text-[#476052]">
