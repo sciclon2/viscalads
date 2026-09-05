@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from ..repositories.history import champions, competitions, matches, profiles
+from ..repositories.history import champions, competitions, matches, profiles, venues
 from .statistics import build_statistics
 
 
@@ -20,6 +20,7 @@ def web_payload(connection: sqlite3.Connection) -> dict:
     } for g in database_games]
     stats = build_statistics(database_games)
     competition_rows = competitions(connection)
+    venue_rows = venues(connection)
     competition_stats = {}
     for competition in competition_rows:
         slug = competition["slug"]
@@ -31,11 +32,13 @@ def web_payload(connection: sqlite3.Connection) -> dict:
             "champions": [item for item in champions(connection) if any(
                 game["tournament"] == item["tournament"] for game in scoped_games
             )],
+            "venues": [venue for venue in venue_rows if venue["competition"] == slug],
         }
     profile_rows = profiles(connection)
     return {
         "generatedFrom": "data/sciclon2.sqlite3",
         "competitions": competition_rows,
+        "venues": venue_rows,
         "competitionStats": competition_stats,
         "games": public_games,
         "players": stats["players"],
@@ -45,6 +48,10 @@ def web_payload(connection: sqlite3.Connection) -> dict:
             "alternate": p["positions"][1] if len(p["positions"]) > 1 else "",
             "notes": p["notes"], "active": p["active"], "photo": p["photo"],
             "competitions": p["competitions"],
+            "firstName": p["first_name"], "lastName": p["last_name"],
+            "nickname": p["nickname"], "birthDate": p["birth_date"],
+            "nationality": p["nationality"], "preferredFoot": p["preferred_foot"],
+            "bio": p["bio"],
         } for p in profile_rows],
         "tournaments": stats["tournaments"], "pairs": stats["pairs"],
         "trios": stats["trios"], "champions": champions(connection),

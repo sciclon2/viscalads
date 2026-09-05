@@ -27,8 +27,11 @@ def matches(connection: sqlite3.Connection) -> list[dict]:
 
 def profiles(connection: sqlite3.Connection) -> list[dict]:
     rows = connection.execute(
-        "SELECT p.id, p.canonical_name, p.active, p.notes, p.photo_path, pp.position, pp.priority "
+        "SELECT p.id, p.canonical_name, p.active, p.notes, p.photo_path, pp.position, pp.priority, "
+        "pd.first_name, pd.last_name, pd.nickname, pd.birth_date, pd.nationality, "
+        "pd.preferred_foot, pd.bio "
         "FROM players p LEFT JOIN player_positions pp ON pp.player_id=p.id "
+        "LEFT JOIN player_details pd ON pd.player_id=p.id "
         "ORDER BY p.canonical_name COLLATE NOCASE, pp.priority"
     ).fetchall()
     grouped: dict[int, dict] = {}
@@ -36,6 +39,10 @@ def profiles(connection: sqlite3.Connection) -> list[dict]:
         profile = grouped.setdefault(row["id"], {
             "name": row["canonical_name"], "active": bool(row["active"]),
             "notes": row["notes"], "photo": row["photo_path"] or "", "positions": [],
+            "first_name": row["first_name"] or "", "last_name": row["last_name"] or "",
+            "nickname": row["nickname"] or "", "birth_date": row["birth_date"] or "",
+            "nationality": row["nationality"] or "",
+            "preferred_foot": row["preferred_foot"] or "", "bio": row["bio"] or "",
         })
         if row["position"]:
             profile["positions"].append(row["position"])
@@ -72,3 +79,26 @@ def competitions(connection: sqlite3.Connection) -> list[dict]:
         "LEFT JOIN matches m ON m.tournament_id=t.id GROUP BY c.id ORDER BY c.id"
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def venues(connection: sqlite3.Connection) -> list[dict]:
+    rows = connection.execute(
+        "SELECT v.*, c.slug AS competition, cv.role, cv.display_order "
+        "FROM venues v JOIN competition_venues cv ON cv.venue_id=v.id "
+        "JOIN competitions c ON c.id=cv.competition_id "
+        "ORDER BY c.id, cv.display_order, v.display_name"
+    ).fetchall()
+    result = []
+    for row in rows:
+        venue = dict(row)
+        venue["facts"] = [dict(fact) for fact in connection.execute(
+            "SELECT category, fact_text FROM venue_facts WHERE venue_id=? "
+            "ORDER BY display_order, id", (row["id"],)
+        ).fetchall()]
+        venue["photos"] = [dict(photo) for photo in connection.execute(
+            "SELECT taken_on, image_url, caption, photo_type, source_url "
+            "FROM venue_photos WHERE venue_id=? "
+            "ORDER BY taken_on DESC, display_order, id", (row["id"],)
+        ).fetchall()]
+        result.append(venue)
+    return result

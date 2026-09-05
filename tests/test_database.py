@@ -125,6 +125,36 @@ class DatabaseTests(unittest.TestCase):
         for profile in payload["profiles"]:
             self.assertTrue(not profile["photo"] or profile["photo"].startswith("/players/"))
 
+    def test_sergio_profile_details_come_from_database(self):
+        profile = next(p for p in web_payload(self.connection)["profiles"] if p["name"] == "Sergio")
+        self.assertEqual("Sergio", profile["firstName"])
+        self.assertEqual("Troiano", profile["lastName"])
+        self.assertEqual("Pelado", profile["nickname"])
+        self.assertEqual("1982-01-14", profile["birthDate"])
+        self.assertEqual("Argentina", profile["nationality"])
+        self.assertEqual("Izquierda", profile["preferredFoot"])
+
+    def test_official_and_alternate_venues_are_scoped(self):
+        payload = web_payload(self.connection)
+        sarria = payload["competitionStats"]["sarria"]["venues"]
+        bogatell = payload["competitionStats"]["bogatell"]["venues"]
+
+        self.assertEqual([("Col·legi Sagrat Cor de Sarrià", "primary")],
+                         [(venue["display_name"], venue["role"]) for venue in sarria])
+        self.assertEqual(
+            [("CEM Bogatell", "primary"),
+             ("Camp de Futbol Municipal Parc de la Catalana", "alternate")],
+            [(venue["display_name"], venue["role"]) for venue in bogatell],
+        )
+        self.assertTrue(all(venue["maps_url"].startswith("https://www.google.com/maps/")
+                            for venue in sarria + bogatell))
+        bogatell_photo = next(
+            photo for photo in bogatell[0]["photos"]
+            if photo["taken_on"] == "2021-07-02"
+        )
+        self.assertEqual("/venues/bogatell-2021-07-02.png", bogatell_photo["image_url"])
+        self.assertEqual("team", bogatell_photo["photo_type"])
+
     def test_all_player_totals_balance(self):
         for player in web_payload(self.connection)["players"]:
             self.assertEqual(

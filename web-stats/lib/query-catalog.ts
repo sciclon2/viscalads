@@ -1,11 +1,12 @@
-import { Activity, Crown, Goal, Sparkles, Users, type LucideIcon } from 'lucide-react';
+import { Activity, Crown, Goal, MapPin, Sparkles, Users, type LucideIcon } from 'lucide-react';
 
-export type QueryId = 'builder' | 'players' | 'points' | 'losses' | 'form' | 'decisive' | 'jinx' | 'partners' | 'rivals' | 'pairs' | 'trios' | 'tournaments' | 'prime' | 'matches' | 'records' | 'coverage' | 'champions';
+export type QueryId = 'builder' | 'venues' | 'players' | 'points' | 'losses' | 'form' | 'decisive' | 'jinx' | 'partners' | 'rivals' | 'pairs' | 'trios' | 'tournaments' | 'prime' | 'matches' | 'records' | 'coverage' | 'champions';
 export type QueryDefinition = { id: QueryId; label: string; description: string; details: string; icon: LucideIcon; needsPlayer?: boolean; supportsMinimum?: boolean; supportsOrder?: boolean; supportsMetric?: boolean; supportsWindow?: boolean };
 
 // Extensión futura: registrar aquí la consulta y añadir su adaptador en la página.
 export const queryCatalog: QueryDefinition[] = [
   { id: 'builder', label: 'Armador de equipos', description: 'Convocá jugadores y creá dos equipos balanceados.', details: 'Equilibra la forma de los últimos 10 partidos y la distribución de defensores, mediocampistas y delanteros. Usa la posición principal y considera la alternativa como flexibilidad adicional.', icon: Users },
+  { id: 'venues', label: 'Canchas', description: 'Dónde jugamos y todo lo que conviene saber antes de ir.', details: 'Reúne las sedes habituales y alternativas de cada grupo. Los horarios y contactos proceden de páginas públicas; las recomendaciones y anécdotas son aportes del grupo.', icon: MapPin },
   { id: 'players', label: 'Ranking de jugadores', description: 'Puntos y efectividad individual.', details: 'Efectividad = puntos obtenidos sobre el máximo posible: 3 por victoria, 1 por empate y 0 por derrota.', icon: Activity, supportsMinimum: true, supportsOrder: true },
   { id: 'points', label: 'Tabla de puntos', description: 'Clasificación: 3 por victoria y 1 por empate.', details: 'Suma todos los puntos de cada jugador: victorias × 3 más empates. Premia tanto el rendimiento como la cantidad jugada.', icon: Activity, supportsMinimum: true, supportsOrder: true },
   { id: 'losses', label: '% de derrotas', description: 'Quién pierde proporcionalmente más o menos.', details: 'Divide las derrotas por los partidos jugados. El filtro de PJ ayuda a evitar conclusiones por muestras pequeñas.', icon: Activity, supportsMinimum: true, supportsOrder: true },

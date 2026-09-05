@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   Crown,
+  Clock,
+  ExternalLink,
   Home,
+  Images,
   Info,
+  MapPin,
   Minus,
+  Phone,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -29,7 +35,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { TeamBuilder } from '@/components/team-builder';
-import { PlayerAvatar } from '@/components/player-avatar';
+import { PlayerAvatar, PlayerName } from '@/components/player-avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 type RecordRow = {
   name: string | string[];
@@ -53,6 +67,7 @@ type FormRow = RecordRow & {
 };
 type Metric = 'effectiveness' | 'played' | 'wins' | 'losses' | 'points';
 type Game = (typeof data.games)[number];
+type Venue = (typeof data.venues)[number];
 type CompetitionId = keyof typeof data.competitionStats;
 const metricLabels: Record<Metric, string> = {
   effectiveness: 'Efectividad',
@@ -252,6 +267,23 @@ export default function StatsDashboard({
                 <Home className="size-4" />
                 <span>Inicio</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('venues');
+                  window.requestAnimationFrame(() =>
+                    document.getElementById('stats-panel')?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'start',
+                    }),
+                  );
+                }}
+                className="header-home"
+                aria-label="Ver canchas"
+              >
+                <MapPin className="size-4" />
+                <span>Canchas</span>
+              </button>
               <select
                 aria-label="Competición"
                 value={competition}
@@ -299,7 +331,7 @@ export default function StatsDashboard({
               ))}
             </div>
           </div>
-          <Card className="border-0 bg-[#f7f4eb]/95 shadow-[0_24px_70px_rgba(20,40,28,.16)] ring-1 ring-[#173d2a]/15">
+          <Card id="stats-panel" className="scroll-mt-4 border-0 bg-[#f7f4eb]/95 shadow-[0_24px_70px_rgba(20,40,28,.16)] ring-1 ring-[#173d2a]/15">
             <CardHeader className="border-b border-[#173d2a]/10 lg:grid-cols-[1fr_auto]">
               <div>
                 <div className="flex items-center gap-2">
@@ -315,15 +347,26 @@ export default function StatsDashboard({
                 </div>
                 <CardDescription>{selected.description}</CardDescription>
               </div>
-              <select
-                value={query}
-                onChange={(event) => setQuery(event.target.value as QueryId)}
-                className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
-              >
-                {queries.map((item) => (
-                  <option key={item.id} value={item.id}>{item.label}</option>
-                ))}
-              </select>
+              {query === 'venues' ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('players')}
+                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
+                >
+                  <ArrowLeft className="size-4" />
+                  Volver a estadísticas
+                </button>
+              ) : (
+                <select
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value as QueryId)}
+                  className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
+                >
+                  {queries.filter((item) => item.id !== 'venues').map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              )}
             </CardHeader>
             <CardContent className="pt-5">
               <div className="mb-5 flex flex-wrap items-end gap-3">
@@ -430,6 +473,8 @@ export default function StatsDashboard({
                 <EmptyCompetition />
               ) : query === 'builder' ? (
                 <TeamBuilder games={games} />
+              ) : query === 'venues' ? (
+                <Venues venues={scope.venues as Venue[]} />
               ) : query === 'champions' ? (
                 <Champions champions={scope.champions} />
               ) : query === 'records' ? (
@@ -568,7 +613,14 @@ function Results({
                 <TableCell className="font-display text-lg text-[#7c8d82]">
                   {index + 1}
                 </TableCell>
-                <TableCell className="font-semibold"><span className="flex items-center gap-2">{typeof row.name === 'string' && <PlayerAvatar name={row.name}/>} {labelOf(row.name)}</span></TableCell>
+                <TableCell className="font-semibold">
+                  <span className="flex items-center gap-2">
+                    {typeof row.name === 'string' && <PlayerAvatar name={row.name}/>} {' '}
+                    {Array.isArray(row.name)
+                      ? row.name.map((name, i) => <span key={name}>{i > 0 && ' · '}<PlayerName name={name} /></span>)
+                      : <PlayerName name={row.name} />}
+                  </span>
+                </TableCell>
                 <TableCell className="text-right">{row.played}</TableCell>
                 <TableCell className="text-right text-[#257347]">
                   {row.wins}
@@ -624,7 +676,7 @@ function ImpactResults({
               <TableCell className="font-display text-lg text-[#7c8d82]">
                 {index + 1}
               </TableCell>
-              <TableCell className="font-semibold">{row.name}</TableCell>
+              <TableCell className="font-semibold"><PlayerName name={String(row.name)} /></TableCell>
               <TableCell className="text-right">{row.played}</TableCell>
               <TableCell className="text-right">{row.teammates}</TableCell>
               <TableCell className="text-right">{pct(row.withRate)}</TableCell>
@@ -690,7 +742,7 @@ function FormResults({ rows, window: _window }: { rows: FormRow[]; window: numbe
                 {index + 1}
               </TableCell>
               <TableCell>
-                <strong className="block">{row.name}</strong>
+                <strong className="block"><PlayerName name={String(row.name)} /></strong>
                 <span className="text-xs text-muted-foreground">
                   último: {row.lastDate} · {row.totalPlayed} PJ
                 </span>
@@ -1033,11 +1085,11 @@ function Matches({ player, games }: { player: string; games: Game[] }) {
             <span>{g.tournament}</span>
           </div>
           <p>
-            {g.team1.join(', ') || 'Equipo pendiente'}{' '}
+            {g.team1.length ? g.team1.map((name, i) => <span key={`a-${name}`}>{i > 0 && ', '}<PlayerName name={name} /></span>) : 'Equipo pendiente'}{' '}
             <b>
               {g.score1 ?? '–'} · {g.score2 ?? '–'}
             </b>{' '}
-            {g.team2.join(', ') || 'Equipo pendiente'}
+            {g.team2.length ? g.team2.map((name, i) => <span key={`b-${name}`}>{i > 0 && ', '}<PlayerName name={name} /></span>) : 'Equipo pendiente'}
           </p>
           <Badge variant="outline">
             {g.status === 'verified' ? 'confirmado' : 'pendiente'}
@@ -1047,6 +1099,81 @@ function Matches({ player, games }: { player: string; games: Game[] }) {
     </div>
   );
 }
+
+function Venues({ venues }: { venues: Venue[] }) {
+  return (
+    <div className="venue-grid">
+      {venues.map((venue) => (
+        <article className="venue-card" key={venue.slug}>
+          <Dialog>
+            <DialogTrigger className="venue-photo" aria-label={`Ver galería de ${venue.display_name}`}>
+              <img src={venue.image_url} alt={`Cancha de ${venue.display_name}`} />
+              <span className={`venue-role venue-role-${venue.role}`}>
+                {venue.role === 'primary' ? 'Sede oficial' : 'Alternativa ocasional'}
+              </span>
+              <span className="venue-gallery-hint"><Images aria-hidden="true" /> Ver galería</span>
+            </DialogTrigger>
+            <DialogContent className="venue-gallery-dialog sm:max-w-5xl">
+              <DialogHeader>
+                <DialogTitle className="font-display text-2xl">{venue.display_name}</DialogTitle>
+                <DialogDescription>Fotos de la cancha, equipos y partidos, ordenadas por fecha.</DialogDescription>
+              </DialogHeader>
+              <div className="venue-gallery-grid">
+                {venue.photos.map((photo) => (
+                  <figure key={`${photo.image_url}-${photo.taken_on ?? 'sin-fecha'}`}>
+                    <img src={photo.image_url} alt={photo.caption || venue.display_name} />
+                    <figcaption>
+                      <strong>{photo.caption || 'Foto de la cancha'}</strong>
+                      <span>{photo.taken_on ? new Date(`${photo.taken_on}T00:00:00`).toLocaleDateString('es-ES') : 'Fecha no registrada'}</span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <div className="venue-content">
+            <div>
+              <p className="venue-kicker">{venue.group_schedule}</p>
+              <h3>{venue.display_name}</h3>
+              <p className="venue-description">{venue.description}</p>
+            </div>
+
+            <dl className="venue-details">
+              <div><MapPin aria-hidden="true" /><dt>Dirección</dt><dd>{venue.address}</dd></div>
+              <div><Clock aria-hidden="true" /><dt>Horario público</dt><dd>{venue.public_hours}</dd></div>
+              <div><Phone aria-hidden="true" /><dt>Contacto</dt><dd><a href={`tel:${venue.phone.replaceAll(' ', '')}`}>{venue.phone}</a></dd></div>
+            </dl>
+
+            <div className="venue-notes">
+              {venue.facts.some((fact) => fact.category === 'useful') && (
+                <section>
+                  <h4>Dato útil</h4>
+                  <ul>{venue.facts.filter((fact) => fact.category === 'useful').map((fact) => <li key={fact.fact_text}>{fact.fact_text}</li>)}</ul>
+                </section>
+              )}
+              {venue.facts.some((fact) => fact.category === 'funny') && (
+                <section className="venue-funny">
+                  <h4>⚽ Folklore del grupo</h4>
+                  <ul>{venue.facts.filter((fact) => fact.category === 'funny').map((fact) => <li key={fact.fact_text}>{fact.fact_text}</li>)}</ul>
+                </section>
+              )}
+            </div>
+
+            <div className="venue-actions">
+              <a className="venue-map" href={venue.maps_url} target="_blank" rel="noreferrer">
+                <MapPin className="size-4" /> Abrir en Google Maps <ExternalLink className="size-3" />
+              </a>
+              <a className="venue-source" href={venue.image_source_url} target="_blank" rel="noreferrer">
+                Fuente de la foto
+              </a>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function Records({ games }: { games: Game[] }) {
   const exact = games.filter(
     (g): g is Game & { score1: number; score2: number } =>
@@ -1186,7 +1313,7 @@ function Champions({
                   <TableCell className="font-display text-lg text-[#7c8d82]">
                     {index + 1}
                   </TableCell>
-                  <TableCell className="font-semibold">{row.name}</TableCell>
+                  <TableCell className="font-semibold"><PlayerName name={row.name} /></TableCell>
                   <TableCell className="text-right">
                     <span className="title-pill">{row.titles}</span>
                   </TableCell>
@@ -1207,7 +1334,10 @@ function Champions({
               <span>{String(i + 1).padStart(2, '0')}</span>
               <div>
                 <p>{item.tournament}</p>
-                <strong>{item.winner}</strong>
+                <strong>{item.winner.split('+').map((name, index) => {
+                  const player = name.trim();
+                  return <span key={player}>{index > 0 && ' + '}<PlayerName name={player} /></span>;
+                })}</strong>
               </div>
               <Crown className="ml-auto size-5 text-[#e3aa22]" />
             </div>

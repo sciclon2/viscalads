@@ -75,10 +75,23 @@ function bestFormation(team: Player[]): Formation {
             counts.DEL >= 1 &&
             counts.DEL <= 2 &&
             counts.MED >= 2
+          : team.length === 8
+            ? counts.DEF === 3 &&
+              counts.MED >= 3 &&
+              counts.DEL >= 1 &&
+              counts.DEL <= 2
           : true;
     const target = {
-      DEF: team.length >= 5 ? 2 : Math.max(1, Math.round(team.length * 0.3)),
-      DEL: Math.min(2, Math.max(1, Math.round(team.length * 0.25))),
+      DEF:
+        team.length === 8
+          ? 3
+          : team.length >= 5
+            ? 2
+            : Math.max(1, Math.round(team.length * 0.3)),
+      DEL:
+        team.length === 8
+          ? 1
+          : Math.min(2, Math.max(1, Math.round(team.length * 0.25))),
     };
     const penalty =
       (valid ? 0 : 1000) +
@@ -218,8 +231,8 @@ export function TeamBuilder({ games = data.games }: { games?: Game[] }) {
     setMessage('');
   };
   const create = () => {
-    if (selected.length < 4) {
-      setMessage('Seleccioná al menos 4 jugadores.');
+    if (selected.length < 8) {
+      setMessage('Seleccioná al menos 8 jugadores.');
       return;
     }
     if (selected.length % 2) {
@@ -305,7 +318,7 @@ export function TeamBuilder({ games = data.games }: { games?: Game[] }) {
               ? `${selected.length / 2} vs ${selected.length / 2}`
               : 'Seleccioná una cantidad par'}
           </p>
-          <Button size="lg" onClick={create} disabled={selected.length < 4}>
+          <Button size="lg" onClick={create} disabled={selected.length < 8}>
             Crear equipos
           </Button>
         </div>
@@ -325,13 +338,15 @@ export function TeamBuilder({ games = data.games }: { games?: Game[] }) {
             <BalanceExplanation teams={teams} />
             <div className="team-summaries">
               <Team
-                title="Equipo Lima"
+                title="Equipo Celeste"
+                tone="sky"
                 players={teams.a}
                 form={average(teams.a)}
                 formation={teams.formationA}
               />
               <Team
-                title="Equipo Coral"
+                title="Equipo Rosa"
+                tone="pink"
                 players={teams.b}
                 form={average(teams.b)}
                 formation={teams.formationB}
@@ -389,11 +404,23 @@ function TeamPitch({
     >
       {teams && (
         <>
-          <div className="pitch-team-label label-a">Equipo Lima</div>
-          <div className="pitch-team-label label-b">Equipo Coral</div>
+          <div className="pitch-team-label label-a">Equipo Celeste</div>
+          <div className="pitch-team-label label-b">Equipo Rosa</div>
         </>
       )}
       <div className="center-circle" />
+      {teams && (
+        <div
+          key={`${teams.a.map((player) => player.name).join('-')}:${teams.b.map((player) => player.name).join('-')}`}
+          className="pitch-versus pitch-versus-safe"
+          aria-hidden="true"
+        >
+          <span className="versus-text">VS</span>
+          <span className="blood-drip blood-drip-one" />
+          <span className="blood-drip blood-drip-two" />
+          <span className="blood-drip blood-drip-three" />
+        </div>
+      )}
       <div className="penalty-box box-a" />
       <div className="penalty-box box-b" />
       {teams ? (
@@ -435,6 +462,8 @@ function BalanceExplanation({ teams }: { teams: TeamPair }) {
   const rule =
     teams.a.length === 6
       ? 'Cada equipo tiene exactamente 2 defensores y entre 1 y 2 delanteros.'
+      : teams.a.length === 8
+        ? 'Cada equipo tiene 3 defensores, al menos 3 medios y entre 1 y 2 delanteros. El arquero rota y no se muestra como posición fija.'
       : teams.a.length === 5
         ? 'Cada equipo tiene como máximo 2 defensores y entre 1 y 2 delanteros.'
         : 'Las líneas se distribuyeron proporcionalmente.';
@@ -443,7 +472,7 @@ function BalanceExplanation({ teams }: { teams: TeamPair }) {
       <div>
         <strong>Forma reciente casi pareja</strong>
         <span>
-          Equipo Lima {avg(teams.a)}% · Equipo Coral {avg(teams.b)}% ·
+          Equipo Celeste {avg(teams.a)}% · Equipo Rosa {avg(teams.b)}% ·
           diferencia {Math.round(teams.difference * 100)} pp.
         </span>
       </div>
@@ -452,7 +481,7 @@ function BalanceExplanation({ teams }: { teams: TeamPair }) {
           {valid ? 'Formaciones válidas' : 'Convocatoria limitada'}
         </strong>
         <span>
-          Lima: {a.DEF} DEF, {a.MED} MED, {a.DEL} DEL · Coral: {b.DEF} DEF,{' '}
+          Celeste: {a.DEF} DEF, {a.MED} MED, {a.DEL} DEL · Rosa: {b.DEF} DEF,{' '}
           {b.MED} MED, {b.DEL} DEL.{' '}
           {valid
             ? rule
@@ -474,17 +503,19 @@ function BalanceExplanation({ teams }: { teams: TeamPair }) {
 
 function Team({
   title,
+  tone,
   players,
   form,
   formation,
 }: {
   title: string;
+  tone: 'sky' | 'pink';
   players: Player[];
   form: number;
   formation: Formation;
 }) {
   return (
-    <article className="generated-team">
+    <article className={`generated-team generated-team-${tone}`}>
       <header>
         <div>
           <span>PROPUESTA</span>

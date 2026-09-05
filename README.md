@@ -4,7 +4,7 @@ Viscalads is a local-first football history, statistics and balanced-team projec
 
 The repository is private by design. Original WhatsApp exports, private media and OCR scratch files must never be committed. Curated competition and player images used by the interface live under `web-stats/public/` and may be versioned deliberately.
 
-Current release: [`v1.0.0-alpha.1`](https://github.com/sciclon2/viscalads/releases/tag/v1.0.0-alpha.1). It is a pre-release: the data model and generated outputs are validated, but the product is still evolving.
+Current release: [`v1.0.0-alpha.2`](https://github.com/sciclon2/viscalads/releases/tag/v1.0.0-alpha.2). It is a pre-release: the data model and generated outputs are validated, but the product is still evolving.
 
 ## Architecture
 
@@ -78,6 +78,10 @@ The landing page presents the two competitions. Selecting Sarrià or Bogatell op
 - Tournament performance, player prime, match history, records, coverage and honours.
 - Balanced-team builder using player form and primary/secondary positions.
 - Local player photos with initials as the fallback.
+- Player profile cards with personal and football information.
+- Dedicated venue section with official/alternate grounds, practical information and Google Maps links.
+- Date-aware venue galleries for team, match and celebration photos.
+- Eight-player-per-team formations with three defenders, at least three midfielders and a rotating goalkeeper.
 
 ## Data rules
 
@@ -114,7 +118,7 @@ python -m unittest discover -s tests -v
 
 The tests create temporary databases and do not alter the real history.
 
-The alpha release baseline contains 12 automated database and business-rule tests. A production web build can be checked with:
+The alpha release baseline contains 14 automated database and business-rule tests. A production web build can be checked with:
 
 ```bash
 pnpm --dir web-stats build
