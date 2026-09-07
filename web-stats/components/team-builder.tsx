@@ -1,182 +1,48 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { GripVertical, RefreshCw, Users, X } from 'lucide-react';
+import { Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlayerAvatar } from '@/components/player-avatar';
-import { useStatsData, type Game, type Profile } from '@/lib/stats-context';
+import { PitchMarkings } from '@/components/pitch-markings';
+import type { Game, PlayerStat, Profile } from '@/lib/stats-context';
 import { API } from '@/components/site-client';
+import { playerPositions } from '@/lib/player-options';
+import {
+  pitchPosition,
+  positionRole as role,
+  type Formation,
+} from '@/lib/team-formation';
+import { splitBalancedTeams, type BalancedTeams } from '@/lib/team-balancer';
+import { currentTournamentLeaders, prematchFacts, type FactRule, type PrematchFact } from '@/lib/prematch-facts';
 
-type Player = Profile & { form: number; played: number; lastDate: string };
-type Role = 'DEF' | 'MED' | 'DEL';
-type Formation = {
-  roles: Record<string, Role>;
-  counts: Record<Role, number>;
-  valid: boolean;
-  alternateUses: number;
+type Player = Pick<
+  Profile,
+  'id' | 'name' | 'primary' | 'alternate' | 'rating'
+> & {
+  level: number;
+  played: number;
+  lastDate: string;
+  guest?: boolean;
 };
-type TeamPair = {
-  a: Player[];
-  b: Player[];
-  difference: number;
-  formationA: Formation;
-  formationB: Formation;
-};
+type TeamPair = BalancedTeams<Player>;
 
-function resultPoints(game: Game, name: string) {
-  const side = game.team1.includes(name) ? '1' : '2';
-  if (game.outcome === 'D') return 1;
-  return game.outcome === side ? 3 : 0;
-}
-
-function role(position: string): Role {
-  const text = position.toLowerCase();
-  if (text.includes('defen')) return 'DEF';
-  if (text.includes('medio')) return 'MED';
-  return 'DEL';
-}
-
-function bestFormation(team: Player[]): Formation {
-  let best: Formation | null = null,
-    bestPenalty = Infinity;
-  const roles: Record<string, Role> = {};
-  const walk = (index: number, alternateUses: number) => {
-    if (index < team.length) {
-      const player = team[index],
-        primary = role(player.primary),
-        options = [
-          primary,
-          ...(player.alternate ? [role(player.alternate)] : []),
-        ].filter((v, i, a) => a.indexOf(v) === i);
-      options.forEach((choice) => {
-        roles[player.name] = choice;
-        walk(index + 1, alternateUses + (choice === primary ? 0 : 1));
-      });
-      return;
-    }
-    const counts = Object.values(roles).reduce(
-      (acc, value) => {
-        acc[value]++;
-        return acc;
-      },
-      { DEF: 0, MED: 0, DEL: 0 },
-    );
-    const valid =
-      team.length === 5
-        ? counts.DEF >= 1 &&
-          counts.DEF <= 2 &&
-          counts.DEL >= 1 &&
-          counts.DEL <= 2 &&
-          counts.MED >= 1
-        : team.length === 6
-          ? counts.DEF === 2 &&
-            counts.DEL >= 1 &&
-            counts.DEL <= 2 &&
-            counts.MED >= 2
-          : team.length === 8
-            ? counts.DEF === 3 &&
-              counts.MED >= 3 &&
-              counts.DEL >= 1 &&
-              counts.DEL <= 2
-          : true;
-    const target = {
-      DEF:
-        team.length === 8
-          ? 3
-          : team.length >= 5
-            ? 2
-            : Math.max(1, Math.round(team.length * 0.3)),
-      DEL:
-        team.length === 8
-          ? 1
-          : Math.min(2, Math.max(1, Math.round(team.length * 0.25))),
-    };
-    const penalty =
-      (valid ? 0 : 1000) +
-      alternateUses * 0.2 +
-      Math.abs(counts.DEF - target.DEF) +
-      Math.abs(counts.DEL - target.DEL);
-    if (penalty < bestPenalty) {
-      bestPenalty = penalty;
-      best = { roles: { ...roles }, counts, valid, alternateUses };
-    }
-  };
-  walk(0, 0);
-  return best!;
-}
-
-function splitTeams(players: Player[]): TeamPair {
-  const size = players.length / 2;
-  let best: TeamPair | null = null,
-    bestScore = Infinity;
-  const evaluate = (a: Player[]) => {
-    const names = new Set(a.map((p) => p.name)),
-      b = players.filter((p) => !names.has(p.name));
-    const formA = a.reduce((n, p) => n + p.form, 0) / a.length,
-      formB = b.reduce((n, p) => n + p.form, 0) / b.length;
-    const formationA = bestFormation(a),
-      formationB = bestFormation(b),
-      pa = formationA.counts,
-      pb = formationB.counts;
-    const positionGap =
-      Math.abs(pa.DEF - pb.DEF) +
-      Math.abs(pa.MED - pb.MED) +
-      Math.abs(pa.DEL - pb.DEL);
-    const score =
-      Math.abs(formA - formB) * 12 +
-      positionGap * 0.75 +
-      (formationA.valid && formationB.valid ? 0 : 1000) +
-      formationA.alternateUses * 0.15 +
-      formationB.alternateUses * 0.15;
-    if (score < bestScore) {
-      bestScore = score;
-      best = {
-        a,
-        b,
-        difference: Math.abs(formA - formB),
-        formationA,
-        formationB,
-      };
-    }
-  };
-  if (players.length <= 16) {
-    const chosen: Player[] = [players[0]];
-    const walk = (start: number) => {
-      if (chosen.length === size) {
-        evaluate([...chosen]);
-        return;
-      }
-      for (let i = start; i < players.length; i++) {
-        chosen.push(players[i]);
-        walk(i + 1);
-        chosen.pop();
-      }
-    };
-    walk(1);
-  } else {
-    const sorted = [...players].sort((a, b) => b.form - a.form),
-      a: Player[] = [],
-      b: Player[] = [];
-    sorted.forEach((player) => {
-      const target =
-        a.length >= size
-          ? b
-          : b.length >= size
-            ? a
-            : a.reduce((n, p) => n + p.form, 0) <=
-                b.reduce((n, p) => n + p.form, 0)
-              ? a
-              : b;
-      target.push(player);
-    });
-    evaluate(a);
-  }
-  return best!;
-}
-
-export function TeamBuilder({ games, competition }: { games: Game[]; competition: string }) {
-  const data = useStatsData();
+export function TeamBuilder({
+  games,
+  globalGames,
+  competition,
+  profiles,
+  stats,
+  funnyFactRules,
+}: {
+  games: Game[];
+  globalGames: Game[];
+  competition: string;
+  profiles: Profile[];
+  stats: PlayerStat[];
+  funnyFactRules: FactRule[];
+}) {
   const validGames = useMemo(
     () =>
       games
@@ -184,35 +50,39 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
         .sort((a, b) => a.date.localeCompare(b.date)),
     [games],
   );
-  const players = useMemo<Player[]>(
+  const profilePlayers = useMemo<Player[]>(
     () =>
-      data.profiles
-        .filter((p) => p.primary)
+      profiles
+        .filter((p) => p.primary && p.competitions.includes(competition))
         .map((profile) => {
           const history = validGames.filter(
             (game) =>
               game.team1.includes(profile.name) ||
               game.team2.includes(profile.name),
           );
-          const recent = history.slice(-10),
-            earned = recent.reduce(
-              (sum, game) => sum + resultPoints(game, profile.name),
-              0,
-            );
           return {
             ...profile,
-            form: recent.length ? earned / (recent.length * 3) : 0,
+            level: profile.rating?.current ?? 5,
             played: history.length,
             lastDate: history.at(-1)?.date ?? '—',
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [validGames],
+    [validGames, profiles, competition],
   );
-  const [selected, setSelected] = useState<string[]>([]),
+  const tournamentState = useMemo(() => currentTournamentLeaders(validGames), [validGames]);
+  const [guests, setGuests] = useState<Player[]>([]),
+    [guestLevel, setGuestLevel] = useState('5'),
+    [guestPosition, setGuestPosition] = useState(''),
+    [selected, setSelected] = useState<string[]>([]),
     [search, setSearch] = useState(''),
     [teams, setTeams] = useState<TeamPair | null>(null),
+    [facts, setFacts] = useState<PrematchFact[] | null>(null),
     [message, setMessage] = useState('');
+  const players = useMemo(
+    () => [...profilePlayers, ...guests],
+    [profilePlayers, guests],
+  );
   const selectedPlayers = selected
     .map((name) => players.find((p) => p.name === name)!)
     .filter(Boolean);
@@ -228,7 +98,35 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
         : [...current, name],
     );
     setTeams(null);
+    setFacts(null);
     setMessage('');
+  };
+  const addGuest = () => {
+    const level = Number(guestLevel.replace(',', '.'));
+    if (!Number.isFinite(level) || level < 1 || level > 10) {
+      setMessage('El nivel del invitado debe estar entre 1 y 10.');
+      return;
+    }
+    const used = new Set(guests.map((guest) => guest.name));
+    let number = 1;
+    while (used.has(`Invitado ${number}`)) number++;
+    const guest: Player = {
+      id: -Date.now() - number,
+      name: `Invitado ${number}`,
+      primary: guestPosition,
+      alternate: '',
+      rating: null,
+      level,
+      played: 0,
+      lastDate: '—',
+      guest: true,
+    };
+    setGuests((current) => [...current, guest]);
+    setSelected((current) => [...current, guest.name]);
+    setGuestPosition('');
+    setMessage('');
+    setTeams(null);
+    setFacts(null);
   };
   const create = () => {
     if (selected.length < 8) {
@@ -239,20 +137,31 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
       setMessage('La cantidad debe ser par para formar equipos iguales.');
       return;
     }
-    const result = splitTeams(selectedPlayers);
+    const leaders = tournamentState.matchDays >= 3
+      ? tournamentState.leaders.slice(0, 4).map(([name]) => name)
+      : [];
+    const result = splitBalancedTeams(selectedPlayers, validGames, { leaders });
     setTeams(result);
+    setFacts(null);
     setMessage('');
     void fetch(`${API}/lineups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         competition,
-        teams: [result.a.map((item) => item.id), result.b.map((item) => item.id)],
+        teams: [
+          result.a.map((item) => item.guest
+            ? { guestName: item.name, level: item.level, position: item.primary }
+            : { playerId: item.id }),
+          result.b.map((item) => item.guest
+            ? { guestName: item.name, level: item.level, position: item.primary }
+            : { playerId: item.id }),
+        ],
       }),
     });
   };
   const average = (team: Player[]) =>
-    team.reduce((n, p) => n + p.form, 0) / team.length;
+    team.reduce((n, p) => n + p.level, 0) / team.length;
   return (
     <div className="builder-shell">
       <section className="player-bank">
@@ -285,13 +194,53 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
               <span>
                 <strong>{player.name}</strong>
                 <small>
-                  {player.primary}
+                  {player.primary || 'Flexible / sin posición'}
                   {player.alternate ? ` · alt. ${player.alternate}` : ''}
                 </small>
               </span>
-              <b>{Math.round(player.form * 100)}%</b>
+              <b
+                title={
+                  player.rating?.dynamic
+                    ? `${player.rating.recentMatches} partidos válidos en ${player.rating.windowDays} días`
+                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 90} días`
+                }
+              >
+                {player.level.toFixed(2)}
+              </b>
             </button>
           ))}
+        </div>
+        <div className="guest-builder">
+          <div>
+            <strong>Agregar invitado</strong>
+            <span>No guarda estadísticas</span>
+          </div>
+          <label>
+            Nivel (obligatorio)
+            <input
+              inputMode="decimal"
+              value={guestLevel}
+              onChange={(event) => setGuestLevel(event.target.value)}
+              placeholder="1–10"
+            />
+          </label>
+          <label>
+            Posición (opcional)
+            <select
+              value={guestPosition}
+              onChange={(event) => setGuestPosition(event.target.value)}
+            >
+              <option value="">Flexible / sin definir</option>
+              {playerPositions.map((position) => (
+                <option key={position} value={position}>
+                  {position}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={addGuest}>
+            <Plus /> Agregar a la convocatoria
+          </button>
         </div>
       </section>
       <section className="builder-work">
@@ -306,6 +255,8 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
               onClick={() => {
                 setSelected([]);
                 setTeams(null);
+                setFacts(null);
+                setGuests([]);
               }}
             >
               <RefreshCw className="size-4" />
@@ -340,11 +291,55 @@ export function TeamBuilder({ games, competition }: { games: Game[]; competition
                 <h3>Por qué elegimos estos equipos</h3>
               </div>
               <div className="balance-mark">
-                <strong>{Math.round(teams.difference * 100)} pp</strong>
-                <span>diferencia de forma</span>
+                <strong>
+                  {teams.difference <= 0.1
+                    ? 'Excelente'
+                    : teams.difference <= 0.25
+                      ? 'Muy parejo'
+                      : teams.difference <= 0.5
+                        ? 'Aceptable'
+                        : 'Ajustado'}
+                </strong>
+                <span>calidad del balance</span>
               </div>
             </div>
-            <BalanceExplanation teams={teams} />
+            <BalanceExplanation
+              teams={teams}
+              tournament={tournamentState.tournament}
+              leaders={tournamentState.matchDays >= 3 ? tournamentState.leaders.slice(0, 4).map(([name]) => name) : []}
+            />
+            <div className="prematch-facts-action">
+              <button
+                type="button"
+                onClick={() => setFacts(prematchFacts(
+                  validGames,
+                  teams.a.filter((player) => !player.guest).map((player) => player.name),
+                  teams.b.filter((player) => !player.guest).map((player) => player.name),
+                  stats,
+                  funnyFactRules,
+                  globalGames,
+                ))}
+              >
+                <Flame /> Datos para la previa
+              </button>
+              <span>Se calculan localmente con el historial de {competition}.</span>
+            </div>
+            {facts && (
+              <section className="prematch-facts">
+                <header>
+                  <span>Sin IA · datos del historial</span>
+                  <h3>La previa del partido</h3>
+                </header>
+                {facts.length ? facts.map((fact) => (
+                  <article key={fact.code}>
+                    <strong>{fact.title} <small>{fact.scope === 'global' ? 'Historial global' : competition}</small></strong>
+                    <p>{fact.text}</p>
+                  </article>
+                )) : (
+                  <p className="prematch-facts-empty">Todavía no hay suficiente historial entre estos jugadores para encontrar un dato sólido.</p>
+                )}
+              </section>
+            )}
             <div className="team-summaries">
               <Team
                 title="Equipo Celeste"
@@ -384,18 +379,17 @@ function TeamPitch({
       const playerRole = formation.roles[player.name],
         peers = team.filter((p) => formation.roles[p.name] === playerRole),
         index = peers.findIndex((p) => p.name === player.name);
-      const x =
-        side === 'a'
-          ? { DEF: 13, MED: 29, DEL: 43 }[playerRole]
-          : { DEF: 87, MED: 71, DEL: 57 }[playerRole];
-      const y = ((index + 1) / (peers.length + 1)) * 100;
+      const { x, y } = pitchPosition(playerRole, index, peers.length, side);
       return (
         <div
           key={`${side}-${player.name}`}
           className={`pitch-player pitch-player-${side}`}
           style={{ left: `${x}%`, top: `${y}%` }}
         >
-          <PlayerAvatar name={player.name} className="mb-1 size-9 border-2 border-white" />
+          <PlayerAvatar
+            name={player.name}
+            className="mb-1 size-9 border-2 border-white"
+          />
           <span>{player.name}</span>
           <small>{playerRole}</small>
         </div>
@@ -417,7 +411,7 @@ function TeamPitch({
           <div className="pitch-team-label label-b">Equipo Rosa</div>
         </>
       )}
-      <div className="center-circle" />
+      <PitchMarkings />
       {teams && (
         <div
           key={`${teams.a.map((player) => player.name).join('-')}:${teams.b.map((player) => player.name).join('-')}`}
@@ -430,8 +424,6 @@ function TeamPitch({
           <span className="blood-drip blood-drip-three" />
         </div>
       )}
-      <div className="penalty-box box-a" />
-      <div className="penalty-box box-b" />
       {teams ? (
         <>
           {placed(teams.a, teams.formationA, 'a')}
@@ -451,8 +443,17 @@ function TeamPitch({
               onClick={() => onRemove(player.name)}
               className="selected-player"
             >
-              <PlayerAvatar name={player.name} className="selected-player-avatar size-10" />
-              <span className="selected-player-copy"><strong>{player.name}</strong><small>{role(player.primary)} · {Math.round(player.form * 100)}%</small></span>
+              <PlayerAvatar
+                name={player.name}
+                className="selected-player-avatar size-10"
+              />
+              <span className="selected-player-copy">
+                <strong>{player.name}</strong>
+                <small>
+                  {player.primary ? role(player.primary) : 'Flexible'} · nivel{' '}
+                  {player.level.toFixed(2)}
+                </small>
+              </span>
               <X className="size-3.5" />
             </button>
           ))}
@@ -462,27 +463,51 @@ function TeamPitch({
   );
 }
 
-function BalanceExplanation({ teams }: { teams: TeamPair }) {
+function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; tournament: string; leaders: string[] }) {
   const a = teams.formationA.counts,
     b = teams.formationB.counts,
-    avg = (team: Player[]) =>
-      Math.round((team.reduce((n, p) => n + p.form, 0) / team.length) * 100),
-    valid = teams.formationA.valid && teams.formationB.valid;
+    valid = teams.formationA.valid && teams.formationB.valid,
+    strongA = teams.a.filter(
+      (player) => (player.rating?.formScore ?? 0.5) >= 0.7,
+    ),
+    strongB = teams.b.filter(
+      (player) => (player.rating?.formScore ?? 0.5) >= 0.7,
+    ),
+    quietA = teams.a.filter(
+      (player) => (player.rating?.formScore ?? 0.5) <= 0.3,
+    ),
+    quietB = teams.b.filter(
+      (player) => (player.rating?.formScore ?? 0.5) <= 0.3,
+    );
+  const chemistryNotes = [
+    teams.notablePairsA[0]
+      ? pairExplanation(teams.notablePairsA[0], 'Celeste')
+      : '',
+    teams.notablePairsB[0]
+      ? pairExplanation(teams.notablePairsB[0], 'Rosa')
+      : '',
+  ].filter(Boolean);
   const rule =
     teams.a.length === 6
-      ? 'Cada equipo tiene exactamente 2 defensores y entre 1 y 2 delanteros.'
+      ? `Cada equipo tiene exactamente 2 defensores y entre 1 y 2 delanteros.${teams.keeperA || teams.keeperB ? ' Los porteros se muestran bajo el arco y no se cuentan como defensores.' : ''}`
       : teams.a.length === 8
-        ? 'Cada equipo tiene 3 defensores, al menos 3 medios y entre 1 y 2 delanteros. El arquero rota y no se muestra como posición fija.'
-      : teams.a.length === 5
-        ? 'Cada equipo tiene como máximo 2 defensores y entre 1 y 2 delanteros.'
-        : 'Las líneas se distribuyeron proporcionalmente.';
+        ? `Cada equipo tiene 3 defensores, al menos 3 medios y entre 1 y 2 delanteros.${teams.keeperA || teams.keeperB ? ' El portero aparece separado, bajo el arco.' : ' Como no hay portero natural, el arco seguirá rotando.'}`
+        : teams.a.length === 5
+          ? 'Cada equipo tiene como máximo 2 defensores y entre 1 y 2 delanteros.'
+          : 'Las líneas se distribuyeron proporcionalmente.';
   return (
     <div className="balance-explanation">
       <div>
-        <strong>Forma reciente casi pareja</strong>
+        <strong>
+          {teams.difference <= 0.1
+            ? 'Dos equipos muy parejos'
+            : teams.difference <= 0.25
+              ? 'Un equilibrio sólido'
+              : 'La convocatoria permite un equilibrio limitado'}
+        </strong>
         <span>
-          Equipo Celeste {avg(teams.a)}% · Equipo Rosa {avg(teams.b)}% ·
-          diferencia {Math.round(teams.difference * 100)} pp.
+          Se repartió el nivel actual para que ninguno de los dos lados
+          concentre claramente a los jugadores más fuertes de esta convocatoria.
         </span>
       </div>
       <div>
@@ -490,24 +515,64 @@ function BalanceExplanation({ teams }: { teams: TeamPair }) {
           {valid ? 'Formaciones válidas' : 'Convocatoria limitada'}
         </strong>
         <span>
-          Celeste: {a.DEF} DEF, {a.MED} MED, {a.DEL} DEL · Rosa: {b.DEF} DEF,{' '}
-          {b.MED} MED, {b.DEL} DEL.{' '}
+          Ambos lados tienen una estructura comparable: Celeste juega con{' '}
+          {a.DEF} defensores, {a.MED} medios y {a.DEL} delanteros; Rosa con{' '}
+          {b.DEF}, {b.MED} y {b.DEL}.{' '}
           {valid
             ? rule
             : 'No hay suficientes posiciones compatibles para cumplir todos los límites.'}
         </span>
       </div>
       <div>
-        <strong>Posiciones alternativas</strong>
+        <strong>Portería</strong>
         <span>
-          Se usaron{' '}
-          {teams.formationA.alternateUses + teams.formationB.alternateUses}{' '}
-          posiciones alternativas para completar las líneas sin romper el
-          balance.
+          {teams.keeperA && teams.keeperB
+            ? `${teams.keeperA.name} y ${teams.keeperB.name} quedaron separados, uno por equipo; por eso la portería no da ventaja adicional a ningún lado.`
+            : teams.keeperA || teams.keeperB
+              ? `${(teams.keeperA ?? teams.keeperB)!.name} es el único portero disponible. Su ventaja fue compensada repartiendo el nivel de campo.`
+              : 'No hay un portero natural en la convocatoria, así que este factor no inclinó el armado.'}
         </span>
       </div>
+      <div>
+        <strong>Momento de los jugadores</strong>
+        <span>
+          {strongA.length || strongB.length
+            ? `Los jugadores que llegan en mejor momento también fueron distribuidos entre los equipos: ${[strongA.length ? `${strongA.map((player) => player.name).join(', ')} en Celeste` : '', strongB.length ? `${strongB.map((player) => player.name).join(', ')} en Rosa` : ''].filter(Boolean).join('; ')}.`
+            : 'No hay grandes diferencias de momento reciente, por lo que pesaron más el nivel y las posiciones.'}{' '}
+          {quietA.length || quietB.length
+            ? 'Quienes están recuperando ritmo quedaron acompañados por compañeros de momento más estable.'
+            : ''}
+        </span>
+      </div>
+      <div>
+        <strong>Química y flexibilidad</strong>
+        <span>
+          {teams.notablePairsA.length || teams.notablePairsB.length
+            ? `${chemistryNotes.join(' ')} Las duplas positivas y negativas sólo se usan para afinar el equilibrio: no impiden que todos jueguen con todos y nunca pesan más que el nivel o la formación.`
+            : 'No había duplas con suficiente historial como para alterar la propuesta.'}{' '}
+          Se recurrió a{' '}
+          {teams.formationA.alternateUses + teams.formationB.alternateUses}{' '}
+          posiciones alternativas para completar las líneas.
+        </span>
+      </div>
+      {leaders.length >= 2 && teams.a.some((player) => leaders.includes(player.name)) && teams.b.some((player) => leaders.includes(player.name)) && (
+        <div>
+          <strong>Duelo por la punta</strong>
+          <span>Los jugadores de arriba de {tournament} quedaron repartidos: {teams.a.filter((player) => leaders.includes(player.name)).map((player) => player.name).join(', ')} en Celeste y {teams.b.filter((player) => leaders.includes(player.name)).map((player) => player.name).join(', ')} en Rosa. Se usó como preferencia secundaria porque la formación y el balance seguían siendo compatibles.</span>
+        </div>
+      )}
     </div>
   );
+}
+
+function pairExplanation(
+  pair: TeamPair['notablePairsA'][number],
+  team: string,
+) {
+  const names = pair.names.join(' y ');
+  if (pair.adjustment > 0)
+    return `${names}, en ${team}, muestran buenos antecedentes cuando juegan juntos.`;
+  return `${names}, en ${team}, han rendido por debajo de su nivel habitual como dupla; el armado contempla esa desventaja.`;
 }
 
 function Team({
@@ -530,7 +595,7 @@ function Team({
           <span>PROPUESTA</span>
           <h3>{title}</h3>
         </div>
-        <strong>{Math.round(form * 100)}%</strong>
+        <strong>{form.toFixed(2)}</strong>
       </header>
       <div>
         {[...players]
@@ -539,19 +604,23 @@ function Team({
           )
           .map((player) => {
             const assigned = formation.roles[player.name],
-              isAlternate = assigned !== role(player.primary);
+              isFlexible = !player.primary,
+              isAlternate = !isFlexible && assigned !== role(player.primary);
             return (
               <div className="team-player" key={player.name}>
                 <PlayerAvatar name={player.name} className="size-9" />
                 <span>
                   <strong>{player.name}</strong>
                   <small>
-                    {assigned} · {isAlternate
-                      ? `Alternativa: ${player.alternate}`
-                      : player.primary}
+                    {assigned} ·{' '}
+                    {isFlexible
+                      ? 'Invitado flexible'
+                      : isAlternate
+                        ? `Alternativa: ${player.alternate}`
+                        : player.primary}
                   </small>
                 </span>
-                <em>{Math.round(player.form * 100)}%</em>
+                <em>{player.level.toFixed(2)}</em>
               </div>
             );
           })}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ClipboardPlus,
@@ -16,9 +16,11 @@ import {
   Phone,
   TrendingDown,
   TrendingUp,
+  Trophy,
+  UsersRound,
 } from 'lucide-react';
 import { queryCatalog as queries, type QueryId } from '@/lib/query-catalog';
-import type { Game, StatsData, Venue } from '@/lib/stats-context';
+import type { Game, PlayerStat, Profile, StatsData, Venue } from '@/lib/stats-context';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -38,6 +40,8 @@ import {
 } from '@/components/ui/table';
 import { TeamBuilder } from '@/components/team-builder';
 import { MatchEntry } from '@/components/match-entry';
+import { PlayersSection } from '@/components/players-section';
+import { TournamentsSection } from '@/components/tournaments-section';
 import { PlayerAvatar, PlayerName } from '@/components/player-avatar';
 import {
   Dialog,
@@ -65,11 +69,23 @@ type FormRow = RecordRow & {
   totalPlayed: number;
   currentRate: number;
   trend: 'up' | 'neutral' | 'down';
-  sequence: ('W' | 'D' | 'L')[];
+  sequence: Array<{ result: 'W' | 'D' | 'L'; date: string }>;
   lastDate: string;
+  teammates: Array<RecordRow & { share: number }>;
 };
 type Metric = 'effectiveness' | 'played' | 'wins' | 'losses' | 'points';
 type CompetitionId = string;
+type Workspace = 'stats' | 'players' | 'builder' | 'create' | 'admin' | 'tournaments';
+type ViewId = Workspace | 'venues';
+const validViews = new Set<ViewId>([
+  'stats',
+  'players',
+  'builder',
+  'create',
+  'admin',
+  'tournaments',
+  'venues',
+]);
 const metricLabels: Record<Metric, string> = {
   effectiveness: 'Efectividad',
   played: 'Partidos',
@@ -93,12 +109,6 @@ function pct(value: number) {
     maximumFractionDigits: 1,
   }).format(value);
 }
-function daysBetween(earlier: string, later: string) {
-  return Math.floor(
-    (Date.parse(`${later}T00:00:00Z`) - Date.parse(`${earlier}T00:00:00Z`)) /
-      86_400_000,
-  );
-}
 function labelOf(name: string | string[]) {
   return Array.isArray(name) ? name.join(' · ') : name;
 }
@@ -113,35 +123,49 @@ function valueFor(row: RecordRow, metric: Metric) {
           ? row.wins
           : row.losses;
 }
-function resultFor(game: Game, player: string) {
+function resultFor(game: Game, player: string): 'W' | 'D' | 'L' {
   const side = game.team1.includes(player) ? '1' : '2';
   return game.outcome === 'D' ? 'D' : game.outcome === side ? 'W' : 'L';
 }
 
 export default function StatsDashboard({
   initialCompetition,
+  initialView,
   data,
   onDataChanged,
 }: {
   initialCompetition: CompetitionId;
+  initialView?: string;
   data: StatsData;
   onDataChanged: () => Promise<void>;
 }) {
-  const [competition, setCompetition] = useState<CompetitionId>(initialCompetition);
-  const [workspace, setWorkspace] = useState<'stats' | 'create' | 'admin'>('stats');
-  const [query, setQuery] = useState<QueryId>('players');
+  const [competition, setCompetition] =
+    useState<CompetitionId>(initialCompetition);
+  const startingView = validViews.has(initialView as ViewId)
+    ? (initialView as ViewId)
+    : 'stats';
+  const [workspace, setWorkspace] = useState<Workspace>(
+    startingView === 'venues' ? 'stats' : startingView,
+  );
+  const [query, setQuery] = useState<QueryId>(
+    startingView === 'venues' ? 'venues' : 'players',
+  );
   const [player, setPlayer] = useState('Facu');
   const [minimum, setMinimum] = useState(20);
   const [maximum, setMaximum] = useState(999);
   const [direction, setDirection] = useState<'best' | 'worst'>('best');
   const [metric, setMetric] = useState<Metric>('effectiveness');
-  const [recentWindow, setRecentWindow] = useState<5 | 10 | 20>(10);
-  const [activityDays, setActivityDays] = useState<30 | 60 | 90 | 180 | 99999>(
-    60,
-  );
   const selected = queries.find((item) => item.id === query)!;
   const scope = data.competitionStats[competition];
   const games = scope.games as Game[];
+  const scopedProfiles = useMemo(
+    () =>
+      data.profiles.map((profile) => ({
+        ...profile,
+        rating: scope.ratings[String(profile.id)] ?? null,
+      })),
+    [data.profiles, scope.ratings],
+  );
   const playerNames = useMemo(
     () => scope.players.map((p) => p.name).sort(),
     [scope],
@@ -149,10 +173,6 @@ export default function StatsDashboard({
   const activePlayer = playerNames.includes(player)
     ? player
     : (playerNames[0] ?? '');
-  const latestMatchDate = games.reduce(
-    (latest, game) => (game.date > latest ? game.date : latest),
-    '',
-  );
 
   const rows = useMemo(() => {
     let source: RecordRow[] = [];
@@ -193,6 +213,21 @@ export default function StatsDashboard({
       });
   }, [query, activePlayer, minimum, maximum, direction, metric, scope, games]);
 
+  const currentRanking = useMemo(() => {
+    const statsByName = new Map(scope.players.map((row) => [row.name, row]));
+    return scopedProfiles
+      .filter((profile) => profile.competitions.includes(competition))
+      .map((profile) => ({ profile, stats: statsByName.get(profile.name) }))
+      .filter(({ stats }) => stats && stats.played >= minimum && stats.played <= maximum)
+      .sort((a, b) => {
+        const av = a.profile.rating?.current ?? 0;
+        const bv = b.profile.rating?.current ?? 0;
+        return (direction === 'best' ? bv - av : av - bv) ||
+          (b.profile.rating?.formScore ?? 0.5) - (a.profile.rating?.formScore ?? 0.5) ||
+          a.profile.name.localeCompare(b.profile.name);
+      });
+  }, [scope.players, scopedProfiles, competition, minimum, maximum, direction]);
+
   const impactRows = useMemo(
     () =>
       decisiveRows(games, playerNames)
@@ -214,12 +249,9 @@ export default function StatsDashboard({
   );
   const form = useMemo(
     () =>
-      formRows(recentWindow, games, playerNames)
+      formRows(games, playerNames, scopedProfiles)
         .filter(
-          (row) =>
-            row.totalPlayed >= minimum &&
-            row.totalPlayed <= maximum &&
-            daysBetween(row.lastDate, latestMatchDate) <= activityDays,
+          (row) => row.totalPlayed >= minimum && row.totalPlayed <= maximum,
         )
         .sort(
           (a, b) =>
@@ -227,16 +259,7 @@ export default function StatsDashboard({
               ? b.currentRate - a.currentRate
               : a.currentRate - b.currentRate) || b.totalPlayed - a.totalPlayed,
         ),
-    [
-      recentWindow,
-      activityDays,
-      minimum,
-      maximum,
-      direction,
-      games,
-      playerNames,
-      latestMatchDate,
-    ],
+    [minimum, maximum, direction, games, scopedProfiles, playerNames],
   );
 
   const verified = games.filter((g) => g.status === 'verified').length;
@@ -244,105 +267,161 @@ export default function StatsDashboard({
   const displayMetric: Metric =
     query === 'points' ? 'points' : query === 'losses' ? 'losses' : metric;
 
+  const navigateTo = (view: ViewId, replace = false) => {
+    setWorkspace(view === 'venues' ? 'stats' : view);
+    if (view === 'venues') setQuery('venues');
+    const url = new URL(window.location.href);
+    if (view === 'stats') url.searchParams.delete('view');
+    else url.searchParams.set('view', view);
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', url);
+  };
+
+  useEffect(() => {
+    const restore = () => {
+      const value = new URL(window.location.href).searchParams.get(
+        'view',
+      ) as ViewId | null;
+      const view = value && validViews.has(value) ? value : 'stats';
+      setWorkspace(view === 'venues' ? 'stats' : view);
+      if (view === 'venues') setQuery('venues');
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
   return (
-      <main
-        key="statistics"
-        className="min-h-screen bg-background text-foreground"
-      >
-        <div className="pitch-lines" aria-hidden="true" />
-        <header className="relative border-b border-white/10 bg-[#101b16]/95 text-white">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
-            <div className="flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-full border-2 border-[#d8ff4f] bg-[#1f382b] text-xl">
-                ⚽
-              </div>
-              <div>
-                <p className="font-display text-xl leading-none">NKOS LAB</p>
-                <p className="mt-1 text-xs uppercase tracking-[.2em] text-[#b8c8bf]">
-                  estadística de vestuario
-                </p>
-              </div>
+    <main
+      key="statistics"
+      className="min-h-screen bg-background text-foreground"
+    >
+      <div className="pitch-lines" aria-hidden="true" />
+      <header className="relative border-b border-white/10 bg-[#101b16]/95 text-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-full border-2 border-[#d8ff4f] bg-[#1f382b] text-xl">
+              ⚽
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => window.location.assign('/')}
-                className="header-home"
-                aria-label="Volver a la portada"
-              >
-                <Home className="size-4" />
-                <span>Inicio</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setWorkspace('stats');
-                  setQuery('venues');
-                  window.requestAnimationFrame(() =>
-                    document.getElementById('stats-panel')?.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'start',
-                    }),
-                  );
-                }}
-                className="header-home"
-                aria-label="Ver canchas"
-              >
-                <MapPin className="size-4" />
-                <span>Canchas</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspace('create')}
-                className="header-home"
-                aria-label="Cargar partido"
-              >
-                <ClipboardPlus className="size-4" />
-                <span>Cargar partido</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspace('admin')}
-                className="header-home"
-                aria-label="Administrar partidos"
-              >
-                <ListChecks className="size-4" />
-                <span>Partidos</span>
-              </button>
-              <select
-                aria-label="Competición"
-                value={competition}
-                onChange={(event) =>
-                  { setCompetition(event.target.value as CompetitionId); void onDataChanged(); }
-                }
-                className="h-10 min-w-40 rounded-md border border-white/20 bg-[#25362e] px-3 text-sm text-white"
-              >
-                {data.competitions.map((item) => (
-                  <option key={item.slug} value={item.slug}>
-                    {item.display_name}
-                  </option>
-                ))}
-              </select>
+            <div>
+              <p className="font-display text-xl leading-none">NKOS LAB</p>
+              <p className="mt-1 text-xs uppercase tracking-[.2em] text-[#b8c8bf]">
+                estadística de vestuario
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.location.assign('/')}
+              className="header-home"
+              aria-label="Volver a la portada"
+            >
+              <Home className="size-4" />
+              <span>Inicio</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                navigateTo('venues');
+                window.requestAnimationFrame(() =>
+                  document.getElementById('stats-panel')?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  }),
+                );
+              }}
+              className="header-home"
+              aria-label="Ver canchas"
+            >
+              <MapPin className="size-4" />
+              <span>Canchas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('tournaments')}
+              className="header-home"
+              aria-label="Ver y administrar torneos"
+            >
+              <Trophy className="size-4" />
+              <span>Torneos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('players')}
+              className="header-home"
+              aria-label="Ver y administrar jugadores"
+            >
+              <UsersRound className="size-4" />
+              <span>Jugadores</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('builder')}
+              className="header-home"
+              aria-label="Armar equipos"
+            >
+              <UsersRound className="size-4" />
+              <span>Armar equipos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('create')}
+              className="header-home"
+              aria-label="Guardar partido jugado"
+            >
+              <ClipboardPlus className="size-4" />
+              <span>Guardar partido</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('admin')}
+              className="header-home"
+              aria-label="Administrar partidos"
+            >
+              <ListChecks className="size-4" />
+              <span>Partidos</span>
+            </button>
+            <select
+              aria-label="Competición"
+              value={competition}
+              onChange={(event) => {
+                const next = event.target.value as CompetitionId;
+                setCompetition(next);
+                const url = new URL(window.location.href);
+                url.searchParams.set('competition', next);
+                window.history.pushState({}, '', url);
+                void onDataChanged();
+              }}
+              className="h-10 min-w-40 rounded-md border border-white/20 bg-[#25362e] px-3 text-sm text-white"
+            >
+              {data.competitions.map((item) => (
+                <option key={item.slug} value={item.slug}>
+                  {item.display_name}
+                </option>
+              ))}
+            </select>
+            {workspace === 'stats' && (
               <Badge className="hidden border-[#d8ff4f]/40 bg-[#d8ff4f]/10 text-[#d8ff4f] sm:inline-flex">
                 {games.length} PARTIDOS
               </Badge>
-            </div>
+            )}
           </div>
-        </header>
-        <section className="relative mx-auto max-w-7xl px-5 py-7 lg:px-8 lg:py-10">
-          <div className="mb-7 grid gap-4 lg:grid-cols-[1.45fr_.55fr]">
-            <div>
-              <p className="mb-2 text-sm font-bold uppercase tracking-[.2em] text-[#347a52]">
-                {
-                  data.competitions.find((item) => item.slug === competition)
-                    ?.display_name
-                }
-              </p>
-              <h1 className="font-display max-w-3xl text-4xl leading-[.95] sm:text-6xl">
-                Preguntale al historial.{' '}
-                <span className="text-[#e34f32]">Que decidan los datos.</span>
-              </h1>
-            </div>
+        </div>
+      </header>
+      <section className="relative mx-auto max-w-7xl px-5 py-7 lg:px-8 lg:py-10">
+        <div className={`mb-7 grid gap-4 ${workspace === 'stats' ? 'lg:grid-cols-[1.45fr_.55fr]' : ''}`}>
+          <div>
+            <p className="mb-2 text-sm font-bold uppercase tracking-[.2em] text-[#347a52]">
+              {
+                data.competitions.find((item) => item.slug === competition)
+                  ?.display_name
+              }
+            </p>
+            <h1 className="font-display max-w-3xl text-4xl leading-[.95] sm:text-6xl">
+              Todo el fútbol del grupo.{' '}
+              <span className="text-[#e34f32]">En un solo lugar.</span>
+            </h1>
+          </div>
+          {workspace === 'stats' && (
             <div className="grid grid-cols-3 gap-2 self-end">
               {[
                 ['OFICIALES', games.length],
@@ -355,186 +434,294 @@ export default function StatsDashboard({
                 </div>
               ))}
             </div>
-          </div>
-          <Card id="stats-panel" className="scroll-mt-4 border-0 bg-[#f7f4eb]/95 shadow-[0_24px_70px_rgba(20,40,28,.16)] ring-1 ring-[#173d2a]/15">
-            <CardHeader className="border-b border-[#173d2a]/10 lg:grid-cols-[1fr_auto]">
-              <div>
-                <div className="flex items-center gap-2">
-                  <CardTitle className="font-display text-2xl">
-                    {workspace === 'create' ? 'Cargar partido' : workspace === 'admin' ? 'Administrar partidos' : selected.label}
-                  </CardTitle>
-                  {workspace === 'stats' && <details className="info-details">
+          )}
+        </div>
+        <Card
+          id="stats-panel"
+          className="scroll-mt-4 border-0 bg-[#f7f4eb]/95 shadow-[0_24px_70px_rgba(20,40,28,.16)] ring-1 ring-[#173d2a]/15"
+        >
+          <CardHeader className="border-b border-[#173d2a]/10 lg:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="font-display text-2xl">
+                  {workspace === 'players'
+                    ? 'Jugadores'
+                    : workspace === 'builder'
+                      ? 'La previa: armá los equipos'
+                      : workspace === 'create'
+                        ? 'Guardar partido jugado'
+                        : workspace === 'admin'
+                          ? 'Administrar partidos'
+                          : workspace === 'tournaments'
+                            ? 'Torneos'
+                          : selected.label}
+                </CardTitle>
+                {workspace === 'stats' && (
+                  <details className="info-details">
                     <summary aria-label={`Cómo se calcula ${selected.label}`}>
                       <Info className="size-4" />
                     </summary>
                     <div>{selected.details}</div>
-                  </details>}
-                </div>
-                <CardDescription>{workspace === 'create' ? 'Ingresá un partido nuevo manualmente o partí de una de las últimas cinco formaciones.' : workspace === 'admin' ? 'Corregí o anulá partidos ya guardados.' : selected.description}</CardDescription>
-              </div>
-              {workspace !== 'stats' ? (
-                <button type="button" onClick={() => setWorkspace('stats')} className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"><ArrowLeft className="size-4"/>Volver a estadísticas</button>
-              ) : query === 'venues' ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery('players')}
-                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
-                >
-                  <ArrowLeft className="size-4" />
-                  Volver a estadísticas
-                </button>
-              ) : (
-                <select
-                  value={query}
-                  onChange={(event) => { setQuery(event.target.value as QueryId); void onDataChanged(); }}
-                  className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
-                >
-                  {queries.filter((item) => item.id !== 'venues').map((item) => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </select>
-              )}
-            </CardHeader>
-            <CardContent className="pt-5">
-              {workspace !== 'stats' ? (
-                <MatchEntry mode={workspace} competition={competition} profiles={data.profiles} games={games} onSaved={onDataChanged} />
-              ) : <>
-              <div className="mb-5 flex flex-wrap items-end gap-3">
-                {selected.needsPlayer && (
-                  <Filter label="Jugador">
-                    <select value={activePlayer} onChange={(event) => setPlayer(event.target.value)} className="mt-1 h-10 min-w-48 rounded-md border bg-white px-3">
-                      {playerNames.map((name) => <option key={name} value={name}>{name}</option>)}
-                    </select>
-                  </Filter>
+                  </details>
                 )}
-                {selected.supportsWindow && (
-                  <>
-                    <Filter label="Últimos partidos">
+              </div>
+              <CardDescription>
+                {workspace === 'players'
+                  ? 'Consultá la ficha completa y editá los datos globales de cada jugador.'
+                  : workspace === 'builder'
+                    ? 'Elegí la convocatoria y creá dos equipos equilibrados por nivel y posición.'
+                    : workspace === 'create'
+                      ? 'Registrá un partido que ya se jugó: elegí los equipos, cargá los goles y guardá el resultado.'
+                      : workspace === 'admin'
+                        ? 'Corregí o anulá partidos ya guardados.'
+                        : workspace === 'tournaments'
+                          ? 'Consultá las ediciones anteriores o creá un nuevo torneo.'
+                        : selected.description}
+              </CardDescription>
+            </div>
+            {workspace !== 'stats' ? (
+              <button
+                type="button"
+                onClick={() => navigateTo('stats')}
+                className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
+              >
+                <ArrowLeft className="size-4" />
+                Volver a estadísticas
+              </button>
+            ) : query === 'venues' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('players');
+                  navigateTo('stats');
+                }}
+                className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
+              >
+                <ArrowLeft className="size-4" />
+                Volver a estadísticas
+              </button>
+            ) : (
+              <select
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value as QueryId);
+                  void onDataChanged();
+                }}
+                className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
+              >
+                {queries
+                  .filter((item) => item.id !== 'venues')
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </CardHeader>
+          <CardContent className="pt-5">
+            {workspace === 'players' ? (
+              <PlayersSection
+                competition={competition}
+                profiles={scopedProfiles}
+                stats={scope.players}
+                games={games}
+                onSaved={onDataChanged}
+              />
+            ) : workspace === 'tournaments' ? (
+              <TournamentsSection
+                competition={competition}
+                tournaments={scope.tournamentEditions}
+                games={games}
+                onSaved={onDataChanged}
+              />
+            ) : workspace === 'builder' ? (
+              <TeamBuilder
+                games={games}
+                globalGames={data.games}
+                competition={competition}
+                profiles={scopedProfiles}
+                stats={scope.players}
+                funnyFactRules={data.funnyFactRules}
+              />
+            ) : workspace !== 'stats' ? (
+              <MatchEntry
+                key={competition}
+                mode={workspace}
+                competition={competition}
+                profiles={data.profiles}
+                games={games}
+                tournaments={scope.tournamentEditions}
+                onSaved={onDataChanged}
+              />
+            ) : (
+              <>
+                <div className="mb-5 flex flex-wrap items-end gap-3">
+                  {selected.needsPlayer && (
+                    <Filter label="Jugador">
                       <select
-                        value={String(recentWindow)}
-                        onChange={(event) =>
-                          setRecentWindow(Number(event.target.value) as 5 | 10 | 20)
-                        }
-                        className="mt-1 h-10 min-w-40 rounded-md border bg-white px-3"
+                        value={activePlayer}
+                        onChange={(event) => setPlayer(event.target.value)}
+                        className="mt-1 h-10 min-w-48 rounded-md border bg-white px-3"
                       >
-                        <option value="5">Últimos 5</option>
-                        <option value="10">Últimos 10</option>
-                        <option value="20">Últimos 20</option>
+                        {playerNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
                       </select>
                     </Filter>
-                    <Filter label="Actividad">
+                  )}
+                  {selected.supportsMinimum && (
+                    <>
+                      <Filter label="PJ mínimo">
+                        <NumericFilterInput
+                          ariaLabel="Partidos jugados mínimos"
+                          value={minimum}
+                          min={0}
+                          onValueChange={setMinimum}
+                        />
+                      </Filter>
+                      <Filter label="PJ máximo">
+                        <NumericFilterInput
+                          ariaLabel="Partidos jugados máximos"
+                          value={maximum}
+                          min={1}
+                          emptyValue={999}
+                          placeholder="Sin límite"
+                          onValueChange={setMaximum}
+                        />
+                      </Filter>
+                      <span className="filter-count">
+                        {query === 'decisive'
+                          ? impactRows.length
+                          : query === 'jinx'
+                            ? jinxRows.length
+                            : query === 'form'
+                              ? form.length
+                              : query === 'players'
+                                ? currentRanking.length
+                                : rows.length}{' '}
+                        resultados
+                      </span>
+                    </>
+                  )}
+                  {selected.supportsMetric && (
+                    <Filter label="Métrica">
                       <select
-                        value={String(activityDays)}
+                        value={metric}
                         onChange={(event) =>
-                          setActivityDays(
-                            Number(event.target.value) as 30 | 60 | 90 | 180 | 99999,
-                          )
+                          setMetric(event.target.value as Metric)
                         }
                         className="mt-1 h-10 min-w-44 rounded-md border bg-white px-3"
                       >
-                        <option value="30">Jugó en 30 días</option>
-                        <option value="60">Jugó en 60 días</option>
-                        <option value="90">Jugó en 90 días</option>
-                        <option value="180">Jugó en 180 días</option>
-                        <option value="99999">Sin límite</option>
+                        {Object.entries(metricLabels).map(([id, label]) => (
+                          <option key={id} value={id}>
+                            {label}
+                          </option>
+                        ))}
                       </select>
                     </Filter>
-                  </>
-                )}
-                {selected.supportsMinimum && (
-                  <>
-                    <Filter label="PJ mínimo">
-                      <NumericFilterInput
-                        ariaLabel="Partidos jugados mínimos"
-                        value={minimum}
-                        min={0}
-                        onValueChange={setMinimum}
-                      />
+                  )}
+                  {selected.supportsOrder && (
+                    <Filter label="Orden">
+                      <select
+                        value={direction}
+                        onChange={(event) =>
+                          setDirection(event.target.value as 'best' | 'worst')
+                        }
+                        className="mt-1 h-10 min-w-40 rounded-md border bg-white px-3"
+                      >
+                        <option value="best">Mayor a menor</option>
+                        <option value="worst">Menor a mayor</option>
+                      </select>
                     </Filter>
-                    <Filter label="PJ máximo">
-                      <NumericFilterInput
-                        ariaLabel="Partidos jugados máximos"
-                        value={maximum}
-                        min={1}
-                        emptyValue={999}
-                        placeholder="Sin límite"
-                        onValueChange={setMaximum}
-                      />
-                    </Filter>
-                    <span className="filter-count">
-                      {query === 'decisive'
-                        ? impactRows.length
-                        : query === 'jinx'
-                          ? jinxRows.length
-                          : query === 'form'
-                            ? form.length
-                            : rows.length}{' '}
-                      resultados
-                    </span>
-                  </>
+                  )}
+                </div>
+                {games.length === 0 ? (
+                  <EmptyCompetition />
+                ) : query === 'venues' ? (
+                  <Venues venues={scope.venues as Venue[]} />
+                ) : query === 'champions' ? (
+                  <Champions champions={scope.champions} />
+                ) : query === 'records' ? (
+                  <Records games={games} />
+                ) : query === 'coverage' ? (
+                  <Coverage games={games} />
+                ) : query === 'matches' ? (
+                  <Matches player={activePlayer} games={games} />
+                ) : query === 'decisive' ? (
+                  <ImpactResults rows={impactRows} />
+                ) : query === 'jinx' ? (
+                  <ImpactResults rows={jinxRows} jinx />
+                ) : query === 'form' ? (
+                  <FormResults rows={form} />
+                ) : query === 'tournaments' ? (
+                  <TournamentContribution rows={rows} player={activePlayer} />
+                ) : query === 'players' ? (
+                  <CurrentRanking rows={currentRanking} />
+                ) : (
+                  <Results
+                    rows={rows}
+                    metric={displayMetric}
+                    lossMetric={query === 'losses'}
+                  />
                 )}
-                {selected.supportsMetric && (
-                  <Filter label="Métrica">
-                    <select
-                      value={metric}
-                      onChange={(event) => setMetric(event.target.value as Metric)}
-                      className="mt-1 h-10 min-w-44 rounded-md border bg-white px-3"
-                    >
-                      {Object.entries(metricLabels).map(([id, label]) => (
-                        <option key={id} value={id}>{label}</option>
-                      ))}
-                    </select>
-                  </Filter>
-                )}
-                {selected.supportsOrder && (
-                  <Filter label="Orden">
-                    <select
-                      value={direction}
-                      onChange={(event) => setDirection(event.target.value as 'best' | 'worst')}
-                      className="mt-1 h-10 min-w-40 rounded-md border bg-white px-3"
-                    >
-                      <option value="best">Mayor a menor</option>
-                      <option value="worst">Menor a mayor</option>
-                    </select>
-                  </Filter>
-                )}
-              </div>
-              {games.length === 0 ? (
-                <EmptyCompetition />
-              ) : query === 'builder' ? (
-                <TeamBuilder games={games} competition={competition} />
-              ) : query === 'venues' ? (
-                <Venues venues={scope.venues as Venue[]} />
-              ) : query === 'champions' ? (
-                <Champions champions={scope.champions} />
-              ) : query === 'records' ? (
-                <Records games={games} />
-              ) : query === 'coverage' ? (
-                <Coverage games={games} />
-              ) : query === 'matches' ? (
-              <Matches player={activePlayer} games={games} />
-              ) : query === 'decisive' ? (
-                <ImpactResults rows={impactRows} />
-              ) : query === 'jinx' ? (
-                <ImpactResults rows={jinxRows} jinx />
-              ) : query === 'form' ? (
-                <FormResults rows={form} window={recentWindow} />
-              ) : (
-                <Results
-                  rows={rows}
-                  metric={displayMetric}
-                  lossMetric={query === 'losses'}
-                />
-              )}
-              </>}
-            </CardContent>
-          </Card>
-          <p className="mt-4 text-center text-sm text-[#476052]">
-            3 puntos por victoria · 1 por empate · amistosos y cancelados fuera
-            · datos guardados solo en este laptop
-          </p>
-        </section>
-      </main>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        <p className="mt-4 text-center text-sm text-[#476052]">
+          3 puntos por victoria · 1 por empate · amistosos y cancelados fuera ·
+          datos guardados solo en este laptop
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function CurrentRanking({
+  rows,
+}: {
+  rows: { profile: Profile; stats: PlayerStat | undefined }[];
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#173d2a]/10 bg-white">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-[#173d2a] hover:bg-[#173d2a]">
+            <TableHead className="w-12 text-white">#</TableHead>
+            <TableHead className="text-white">Jugador</TableHead>
+            <TableHead className="text-right text-white">PJ total</TableHead>
+            <TableHead className="text-right text-white">PJ válidos</TableHead>
+            <TableHead className="text-right text-white">Nivel actual</TableHead>
+            <TableHead className="text-right text-white">Momento</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map(({ profile, stats }, index) => (
+            <TableRow key={profile.id}>
+              <TableCell className="font-display text-lg text-[#7c8d82]">{index + 1}</TableCell>
+              <TableCell className="font-semibold">
+                <span className="flex items-center gap-2">
+                  <PlayerAvatar name={profile.name} />
+                  <PlayerName name={profile.name} />
+                </span>
+              </TableCell>
+              <TableCell className="text-right">{stats?.played ?? 0}</TableCell>
+              <TableCell className="text-right">{profile.rating?.recentMatches ?? 0}</TableCell>
+              <TableCell className="text-right font-bold">{profile.rating?.current.toFixed(2) ?? '—'}</TableCell>
+              <TableCell className="text-right">
+                <span className="eff-pill">{Math.round((profile.rating?.formScore ?? 0.5) * 100)}%</span>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {rows.length === 0 && (
+        <div className="p-10 text-center text-muted-foreground">Nadie supera este filtro. Bajá el mínimo.</div>
+      )}
+    </div>
   );
 }
 
@@ -646,10 +833,19 @@ function Results({
                 </TableCell>
                 <TableCell className="font-semibold">
                   <span className="flex items-center gap-2">
-                    {typeof row.name === 'string' && <PlayerAvatar name={row.name}/>} {' '}
-                    {Array.isArray(row.name)
-                      ? row.name.map((name, i) => <span key={name}>{i > 0 && ' · '}<PlayerName name={name} /></span>)
-                      : <PlayerName name={row.name} />}
+                    {typeof row.name === 'string' && (
+                      <PlayerAvatar name={row.name} />
+                    )}{' '}
+                    {Array.isArray(row.name) ? (
+                      row.name.map((name, i) => (
+                        <span key={name}>
+                          {i > 0 && ' · '}
+                          <PlayerName name={name} />
+                        </span>
+                      ))
+                    ) : (
+                      <PlayerName name={row.name} />
+                    )}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">{row.played}</TableCell>
@@ -674,6 +870,141 @@ function Results({
       {rows.length === 0 && (
         <div className="p-10 text-center text-muted-foreground">
           Nadie supera este filtro. Bajá el mínimo.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TournamentContribution({
+  rows,
+  player,
+}: {
+  rows: RecordRow[];
+  player: string;
+}) {
+  const [chartOrder, setChartOrder] = useState<
+    'effectiveness' | 'contribution' | 'chronological'
+  >('effectiveness');
+  const totalPoints = rows.reduce((sum, row) => sum + points(row), 0);
+  const ordered = [...rows].sort((a, b) =>
+    chartOrder === 'effectiveness'
+      ? efficiency(b) - efficiency(a)
+      : chartOrder === 'contribution'
+        ? points(b) - points(a)
+        : String(a.name).localeCompare(String(b.name), undefined, {
+            numeric: true,
+          }),
+  );
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#173d2a]/10 bg-white">
+      <div className="tournament-chart-head">
+        <p>
+          <strong>
+            <PlayerName name={player} />
+          </strong>{' '}
+          consiguió {totalPoints} puntos en estos torneos.
+        </p>
+        <label>
+          Ordenar
+          <select
+            value={chartOrder}
+            onChange={(event) =>
+              setChartOrder(event.target.value as typeof chartOrder)
+            }
+          >
+            <option value="effectiveness">Mejor efectividad</option>
+            <option value="contribution">Mayor aporte</option>
+            <option value="chronological">Cronológico</option>
+          </select>
+        </label>
+      </div>
+      {ordered.length > 0 && (
+        <section
+          className="tournament-bars"
+          aria-label={`Rendimiento de ${player} por torneo`}
+        >
+          <div className="tournament-legend">
+            <span className="legend-effectiveness">Efectividad del torneo</span>
+            <span className="legend-contribution">Aporte al total</span>
+          </div>
+          {ordered.map((row) => {
+            const contribution = totalPoints ? points(row) / totalPoints : 0,
+              performance = efficiency(row);
+            return (
+              <div
+                className="tournament-bar-row"
+                key={`chart-${String(row.name)}`}
+              >
+                <strong>{String(row.name)}</strong>
+                <div className="tournament-track">
+                  <div
+                    className="tournament-bar effectiveness-bar"
+                    style={{ width: `${performance * 100}%` }}
+                  >
+                    <span>{pct(performance)}</span>
+                  </div>
+                </div>
+                <div className="tournament-track contribution-track">
+                  <div
+                    className="tournament-bar contribution-bar"
+                    style={{ width: `${contribution * 100}%` }}
+                  >
+                    <span>{pct(contribution)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-[#173d2a] hover:bg-[#173d2a]">
+            <TableHead className="text-white">Torneo</TableHead>
+            <TableHead className="text-right text-white">PJ</TableHead>
+            <TableHead className="text-right text-white">G</TableHead>
+            <TableHead className="text-right text-white">E</TableHead>
+            <TableHead className="text-right text-white">P</TableHead>
+            <TableHead className="text-right text-white">Puntos</TableHead>
+            <TableHead className="text-right text-white">
+              Aporte al total
+            </TableHead>
+            <TableHead className="text-right text-white">Efectividad</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {ordered.map((row) => (
+            <TableRow key={String(row.name)}>
+              <TableCell className="font-semibold">
+                {String(row.name)}
+              </TableCell>
+              <TableCell className="text-right">{row.played}</TableCell>
+              <TableCell className="text-right text-[#257347]">
+                {row.wins}
+              </TableCell>
+              <TableCell className="text-right">{row.draws}</TableCell>
+              <TableCell className="text-right text-[#c7472e]">
+                {row.losses}
+              </TableCell>
+              <TableCell className="text-right font-bold">
+                {points(row)}
+              </TableCell>
+              <TableCell className="text-right">
+                <span className="eff-pill">
+                  {pct(totalPoints ? points(row) / totalPoints : 0)}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <span className="eff-pill">{pct(efficiency(row))}</span>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {rows.length === 0 && (
+        <div className="p-10 text-center text-muted-foreground">
+          No hay torneos registrados para este jugador.
         </div>
       )}
     </div>
@@ -707,7 +1038,9 @@ function ImpactResults({
               <TableCell className="font-display text-lg text-[#7c8d82]">
                 {index + 1}
               </TableCell>
-              <TableCell className="font-semibold"><PlayerName name={String(row.name)} /></TableCell>
+              <TableCell className="font-semibold">
+                <PlayerName name={String(row.name)} />
+              </TableCell>
               <TableCell className="text-right">{row.played}</TableCell>
               <TableCell className="text-right">{row.teammates}</TableCell>
               <TableCell className="text-right">{pct(row.withRate)}</TableCell>
@@ -743,7 +1076,8 @@ function ImpactResults({
   );
 }
 
-function FormResults({ rows, window: _window }: { rows: FormRow[]; window: number }) {
+function FormResults({ rows }: { rows: FormRow[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const TrendIcon = ({ trend }: { trend: FormRow['trend'] }) =>
     trend === 'up' ? (
       <TrendingUp className="size-5" />
@@ -767,57 +1101,98 @@ function FormResults({ rows, window: _window }: { rows: FormRow[]; window: numbe
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={String(row.name)}>
-              <TableCell className="font-display text-lg text-[#7c8d82]">
-                {index + 1}
-              </TableCell>
-              <TableCell>
-                <strong className="block"><PlayerName name={String(row.name)} /></strong>
-                <span className="text-xs text-muted-foreground">
-                  último: {row.lastDate} · {row.totalPlayed} PJ
-                </span>
-              </TableCell>
-              <TableCell>
-                <div
-                  className="form-sequence"
-                  aria-label={`Resultados recientes de ${labelOf(row.name)}, desde el último partido`}
-                >
-                  {row.sequence.map((result, i) => (
-                    <span
-                      key={i}
-                      className={`result-dot result-${result.toLowerCase()}`}
-                      title={
-                        result === 'W'
-                          ? 'Ganó'
-                          : result === 'D'
-                            ? 'Empató'
-                            : 'Perdió'
-                      }
+          {rows.map((row, index) => {
+            const name = String(row.name),
+              open = expanded === name;
+            return (
+              <Fragment key={name}>
+                <TableRow>
+                  <TableCell className="font-display text-lg text-[#7c8d82]">
+                    {index + 1}
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="form-player-toggle"
+                      aria-expanded={open}
+                      onClick={() => setExpanded(open ? null : name)}
                     >
-                      {result === 'W' ? 'G' : result === 'D' ? 'E' : 'P'}
+                      <strong>
+                        <PlayerName name={name} />
+                      </strong>
+                      <span>
+                        {open ? 'Ocultar compañeros' : 'Ver compañeros'}
+                      </span>
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      último: {row.lastDate} · {row.totalPlayed} PJ
                     </span>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <strong>{pct(row.currentRate)}</strong>
-                <span className="block text-xs text-muted-foreground">
-                  {row.wins}G · {row.draws}E · {row.losses}P
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                <span className={`trend-pill trend-${row.trend}`}>
-                  <TrendIcon trend={row.trend} />
-                  {row.trend === 'up'
-                    ? 'Alto'
-                    : row.trend === 'down'
-                      ? 'Bajo'
-                      : 'Neutral'}
-                </span>
-              </TableCell>
-            </TableRow>
-          ))}
+                  </TableCell>
+                  <TableCell>
+                    <div
+                      className="form-sequence"
+                      aria-label={`Resultados recientes de ${labelOf(row.name)}, desde el último partido`}
+                    >
+                      {row.sequence.map(({ result, date }, i) => (
+                        <span
+                          key={i}
+                          className={`result-dot result-${result.toLowerCase()}`}
+                          title={`${result === 'W' ? 'Ganó' : result === 'D' ? 'Empató' : 'Perdió'} · ${new Date(`${date}T00:00:00`).toLocaleDateString('es-ES')}`}
+                        >
+                          {result === 'W' ? 'G' : result === 'D' ? 'E' : 'P'}
+                        </span>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <strong>{pct(row.currentRate)}</strong>
+                    <span className="block text-xs text-muted-foreground">
+                      {row.wins}G · {row.draws}E · {row.losses}P
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <span className={`trend-pill trend-${row.trend}`}>
+                      <TrendIcon trend={row.trend} />
+                      {row.trend === 'up'
+                        ? 'Alto'
+                        : row.trend === 'down'
+                          ? 'Bajo'
+                          : 'Neutral'}
+                    </span>
+                  </TableCell>
+                </TableRow>
+                {open && (
+                  <TableRow className="form-detail-row">
+                    <TableCell colSpan={5}>
+                      <div className="form-teammate-panel">
+                        <div>
+                          <strong>Compañeros más repetidos</strong>
+                          <span>
+                            En los {row.played} partidos recientes de {name}
+                          </span>
+                        </div>
+                        <div className="form-teammate-grid">
+                          {row.teammates.map((teammate) => (
+                            <article key={String(teammate.name)}>
+                              <PlayerName name={String(teammate.name)} />
+                              <strong>
+                                {teammate.played} de {row.played} ·{' '}
+                                {pct(teammate.share)}
+                              </strong>
+                              <small>
+                                {teammate.wins}G · {teammate.draws}E ·{' '}
+                                {teammate.losses}P juntos
+                              </small>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
         </TableBody>
       </Table>
       {rows.length === 0 && (
@@ -826,27 +1201,43 @@ function FormResults({ rows, window: _window }: { rows: FormRow[]; window: numbe
         </div>
       )}
       <p className="border-t border-[#173d2a]/10 px-4 py-3 text-sm text-muted-foreground">
-        La secuencia empieza por el último partido. Momento alto: 60% o más ·
-        neutral: 40% a 59,9% · bajo: menos de 40%.
+        La secuencia empieza por el último partido. Se usan hasta 10 partidos de
+        los últimos 90 días. Con menos de 5, el nivel queda neutral; entre 5 y
+        9, los partidos faltantes valen 0,5. Alto: 60% o más · neutral: 40% a
+        59,9% · bajo: menos de 40%.
       </p>
     </div>
   );
 }
 
 function formRows(
-  window: number,
   games: Game[],
   playerNames: string[],
+  profiles: Profile[],
 ): FormRow[] {
-  const valid = [...games]
+  const ratingByName = new Map(
+    profiles.map((profile) => [profile.name, profile.rating]),
+  );
+  const referenceDate = new Date();
+  referenceDate.setHours(0, 0, 0, 0);
+  const cutoff = new Date(referenceDate);
+  cutoff.setDate(cutoff.getDate() - 90);
+  const today = referenceDate.toISOString().slice(0, 10);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  const allValid = [...games]
     .filter((g) => g.status === 'verified')
     .sort((a, b) => a.date.localeCompare(b.date));
+  const recentValid = allValid.filter(
+    (g) => g.date >= cutoffDate && g.date <= today,
+  );
   return playerNames.flatMap((name) => {
-    const history = valid.filter(
+    const fullHistory = allValid.filter(
       (g) => g.team1.includes(name) || g.team2.includes(name),
     );
-    if (!history.length) return [];
-    const currentGames = history.slice(-window);
+    const currentGames = recentValid
+      .filter((g) => g.team1.includes(name) || g.team2.includes(name))
+      .slice(-10);
+    if (!currentGames.length) return [];
     const summarize = (games: Game[]) => {
       const row: RecordRow = {
         name,
@@ -863,22 +1254,52 @@ function formRows(
       });
       return row;
     };
-    const current = summarize(currentGames),
-      currentRate = efficiency(current);
+    const current = summarize(currentGames);
+    const currentRate = ratingByName.get(name)?.formScore ?? 0.5;
+    const teammateMap = new Map<string, RecordRow>();
+    currentGames.forEach((game) => {
+      const teammates = (
+        game.team1.includes(name) ? game.team1 : game.team2
+      ).filter((candidate) => candidate !== name);
+      const result = resultFor(game, name);
+      teammates.forEach((teammate) => {
+        const row = teammateMap.get(teammate) ?? {
+          name: teammate,
+          played: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+        };
+        row.played++;
+        if (result === 'W') row.wins++;
+        if (result === 'D') row.draws++;
+        if (result === 'L') row.losses++;
+        teammateMap.set(teammate, row);
+      });
+    });
+    const teammates = [...teammateMap.values()]
+      .map((row) => ({ ...row, share: row.played / currentGames.length }))
+      .sort(
+        (a, b) =>
+          b.played - a.played ||
+          points(b) - points(a) ||
+          String(a.name).localeCompare(String(b.name)),
+      );
     const trend: FormRow['trend'] =
       currentRate >= 0.6 ? 'up' : currentRate < 0.4 ? 'down' : 'neutral';
     const sequence = currentGames
       .slice()
       .reverse()
-      .map((g) => resultFor(g, name));
+      .map((g) => ({ result: resultFor(g, name), date: g.date }));
     return [
       {
         ...current,
-        totalPlayed: history.length,
+        totalPlayed: fullHistory.length,
         currentRate,
         trend,
         sequence,
         lastDate: currentGames.at(-1)!.date,
+        teammates,
       },
     ];
   });
@@ -1116,11 +1537,25 @@ function Matches({ player, games }: { player: string; games: Game[] }) {
             <span>{g.tournament}</span>
           </div>
           <p>
-            {g.team1.length ? g.team1.map((name, i) => <span key={`a-${name}`}>{i > 0 && ', '}<PlayerName name={name} /></span>) : 'Equipo pendiente'}{' '}
+            {g.team1.length
+              ? g.team1.map((name, i) => (
+                  <span key={`a-${name}`}>
+                    {i > 0 && ', '}
+                    <PlayerName name={name} />
+                  </span>
+                ))
+              : 'Equipo pendiente'}{' '}
             <b>
               {g.score1 ?? '–'} · {g.score2 ?? '–'}
             </b>{' '}
-            {g.team2.length ? g.team2.map((name, i) => <span key={`b-${name}`}>{i > 0 && ', '}<PlayerName name={name} /></span>) : 'Equipo pendiente'}
+            {g.team2.length
+              ? g.team2.map((name, i) => (
+                  <span key={`b-${name}`}>
+                    {i > 0 && ', '}
+                    <PlayerName name={name} />
+                  </span>
+                ))
+              : 'Equipo pendiente'}
           </p>
           <Badge variant="outline">
             {g.status === 'verified' ? 'confirmado' : 'pendiente'}
@@ -1137,25 +1572,50 @@ function Venues({ venues }: { venues: Venue[] }) {
       {venues.map((venue) => (
         <article className="venue-card" key={venue.slug}>
           <Dialog>
-            <DialogTrigger className="venue-photo" aria-label={`Ver galería de ${venue.display_name}`}>
-              <img src={venue.image_url} alt={`Cancha de ${venue.display_name}`} />
+            <DialogTrigger
+              className="venue-photo"
+              aria-label={`Ver galería de ${venue.display_name}`}
+            >
+              <img
+                src={venue.image_url}
+                alt={`Cancha de ${venue.display_name}`}
+              />
               <span className={`venue-role venue-role-${venue.role}`}>
-                {venue.role === 'primary' ? 'Sede oficial' : 'Alternativa ocasional'}
+                {venue.role === 'primary'
+                  ? 'Sede oficial'
+                  : 'Alternativa ocasional'}
               </span>
-              <span className="venue-gallery-hint"><Images aria-hidden="true" /> Ver galería</span>
+              <span className="venue-gallery-hint">
+                <Images aria-hidden="true" /> Ver galería
+              </span>
             </DialogTrigger>
             <DialogContent className="venue-gallery-dialog sm:max-w-5xl">
               <DialogHeader>
-                <DialogTitle className="font-display text-2xl">{venue.display_name}</DialogTitle>
-                <DialogDescription>Fotos de la cancha, equipos y partidos, ordenadas por fecha.</DialogDescription>
+                <DialogTitle className="font-display text-2xl">
+                  {venue.display_name}
+                </DialogTitle>
+                <DialogDescription>
+                  Fotos de la cancha, equipos y partidos, ordenadas por fecha.
+                </DialogDescription>
               </DialogHeader>
               <div className="venue-gallery-grid">
                 {venue.photos.map((photo) => (
-                  <figure key={`${photo.image_url}-${photo.taken_on ?? 'sin-fecha'}`}>
-                    <img src={photo.image_url} alt={photo.caption || venue.display_name} />
+                  <figure
+                    key={`${photo.image_url}-${photo.taken_on ?? 'sin-fecha'}`}
+                  >
+                    <img
+                      src={photo.image_url}
+                      alt={photo.caption || venue.display_name}
+                    />
                     <figcaption>
                       <strong>{photo.caption || 'Foto de la cancha'}</strong>
-                      <span>{photo.taken_on ? new Date(`${photo.taken_on}T00:00:00`).toLocaleDateString('es-ES') : 'Fecha no registrada'}</span>
+                      <span>
+                        {photo.taken_on
+                          ? new Date(
+                              `${photo.taken_on}T00:00:00`,
+                            ).toLocaleDateString('es-ES')
+                          : 'Fecha no registrada'}
+                      </span>
                     </figcaption>
                   </figure>
                 ))}
@@ -1170,31 +1630,70 @@ function Venues({ venues }: { venues: Venue[] }) {
             </div>
 
             <dl className="venue-details">
-              <div><MapPin aria-hidden="true" /><dt>Dirección</dt><dd>{venue.address}</dd></div>
-              <div><Clock aria-hidden="true" /><dt>Horario público</dt><dd>{venue.public_hours}</dd></div>
-              <div><Phone aria-hidden="true" /><dt>Contacto</dt><dd><a href={`tel:${venue.phone.replaceAll(' ', '')}`}>{venue.phone}</a></dd></div>
+              <div>
+                <MapPin aria-hidden="true" />
+                <dt>Dirección</dt>
+                <dd>{venue.address}</dd>
+              </div>
+              <div>
+                <Clock aria-hidden="true" />
+                <dt>Horario público</dt>
+                <dd>{venue.public_hours}</dd>
+              </div>
+              <div>
+                <Phone aria-hidden="true" />
+                <dt>Contacto</dt>
+                <dd>
+                  <a href={`tel:${venue.phone.replaceAll(' ', '')}`}>
+                    {venue.phone}
+                  </a>
+                </dd>
+              </div>
             </dl>
 
             <div className="venue-notes">
               {venue.facts.some((fact) => fact.category === 'useful') && (
                 <section>
                   <h4>Dato útil</h4>
-                  <ul>{venue.facts.filter((fact) => fact.category === 'useful').map((fact) => <li key={fact.fact_text}>{fact.fact_text}</li>)}</ul>
+                  <ul>
+                    {venue.facts
+                      .filter((fact) => fact.category === 'useful')
+                      .map((fact) => (
+                        <li key={fact.fact_text}>{fact.fact_text}</li>
+                      ))}
+                  </ul>
                 </section>
               )}
               {venue.facts.some((fact) => fact.category === 'funny') && (
                 <section className="venue-funny">
                   <h4>⚽ Folklore del grupo</h4>
-                  <ul>{venue.facts.filter((fact) => fact.category === 'funny').map((fact) => <li key={fact.fact_text}>{fact.fact_text}</li>)}</ul>
+                  <ul>
+                    {venue.facts
+                      .filter((fact) => fact.category === 'funny')
+                      .map((fact) => (
+                        <li key={fact.fact_text}>{fact.fact_text}</li>
+                      ))}
+                  </ul>
                 </section>
               )}
             </div>
 
             <div className="venue-actions">
-              <a className="venue-map" href={venue.maps_url} target="_blank" rel="noreferrer">
-                <MapPin className="size-4" /> Abrir en Google Maps <ExternalLink className="size-3" />
+              <a
+                className="venue-map"
+                href={venue.maps_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MapPin className="size-4" /> Abrir en Google Maps{' '}
+                <ExternalLink className="size-3" />
               </a>
-              <a className="venue-source" href={venue.image_source_url} target="_blank" rel="noreferrer">
+              <a
+                className="venue-source"
+                href={venue.image_source_url}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Fuente de la foto
               </a>
             </div>
@@ -1344,7 +1843,9 @@ function Champions({
                   <TableCell className="font-display text-lg text-[#7c8d82]">
                     {index + 1}
                   </TableCell>
-                  <TableCell className="font-semibold"><PlayerName name={row.name} /></TableCell>
+                  <TableCell className="font-semibold">
+                    <PlayerName name={row.name} />
+                  </TableCell>
                   <TableCell className="text-right">
                     <span className="title-pill">{row.titles}</span>
                   </TableCell>
@@ -1365,10 +1866,17 @@ function Champions({
               <span>{String(i + 1).padStart(2, '0')}</span>
               <div>
                 <p>{item.tournament}</p>
-                <strong>{item.winner.split('+').map((name, index) => {
-                  const player = name.trim();
-                  return <span key={player}>{index > 0 && ' + '}<PlayerName name={player} /></span>;
-                })}</strong>
+                <strong>
+                  {item.winner.split('+').map((name, index) => {
+                    const player = name.trim();
+                    return (
+                      <span key={player}>
+                        {index > 0 && ' + '}
+                        <PlayerName name={player} />
+                      </span>
+                    );
+                  })}
+                </strong>
               </div>
               <Crown className="ml-auto size-5 text-[#e3aa22]" />
             </div>

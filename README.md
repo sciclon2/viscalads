@@ -4,7 +4,7 @@ Viscalads is a local-first football history, statistics and balanced-team projec
 
 The repository is private by design. Original WhatsApp exports, private media and OCR scratch files must never be committed. Curated competition and player images used by the interface live under `web-stats/public/` and may be versioned deliberately.
 
-Current release: [`v1.0.0-beta.1`](https://github.com/sciclon2/viscalads/releases/tag/v1.0.0-beta.1). It is a beta pre-release: the dynamic database workflow and automated regression suite are operational, while the product continues to evolve through real use.
+Current release: `v1.0.0`. This is the first stable release: the dynamic database workflow, competition and tournament management, match administration, statistics and automated regression suite are operational.
 
 ## Architecture
 
@@ -100,15 +100,15 @@ The main query contract is:
 
 ### Creating a match
 
-1. From a competition dashboard, **Cargar partido** starts with empty teams.
+1. From a competition dashboard, **Guardar partido jugado** starts with empty teams.
 2. The user can add players manually or request `GET /api/lineups` and select
    one of the five latest generated formations as a shortcut. Nothing is loaded
    automatically and the selected formation remains editable.
-3. The UI sends the date, two rosters and goals to `POST /api/matches`.
+3. The current tournament is selected by default; the user can choose a different edition when entering a historical match. The UI sends the tournament, date, two rosters and goals to `POST /api/matches`.
 4. `services.match_entry.save_match` validates the date, competition
    membership, unique participants, guests and scorers.
 5. The service derives both scores and the result from the goals, selects the
-   tournament edition for that date and writes the match, rosters, guests,
+   selected tournament (which must belong to the current competition) and writes the match, rosters, guests,
    known scorers, evidence and audit event in one SQLite transaction.
 6. The browser reloads `/api/stats`; every table immediately reflects the new
    database state without rebuilding static assets.
@@ -140,15 +140,18 @@ newest first; it is not browser cache.
 - Decisive-player and collective-jinx comparisons.
 - Teammate, rival, pair and trio analysis.
 - Tournament performance, player prime, match history, records, coverage and honours.
-- Balanced-team builder using player form and primary/secondary positions.
+- Balanced-team builder using each player's global current level and primary/secondary positions.
 - Local player photos with initials as the fallback.
 - Player profile cards with personal and football information.
+- Competition-scoped player directory with large profile cards and audited editing of identity, personal details, positions, active status and global rating range.
 - Dedicated venue section with official/alternate grounds, practical information and Google Maps links.
 - Date-aware venue galleries for team, match and celebration photos.
 - Eight-player-per-team formations with three defenders, at least three midfielders and a rotating goalkeeper.
 - Dynamic SQLite-backed statistics with no manual web-data refresh.
 - Manual match entry with editable teams, temporary guests, goal-derived results and auditable corrections.
 - The five most recent generated lineups available as match-entry presets.
+- Tournament history with match results, champions and newest-first ordering.
+- Tournament creation from a start date and number of weekly matchdays; names advance automatically from the latest numbered edition.
 
 ## Data rules
 
@@ -163,10 +166,11 @@ newest first; it is not browser cache.
 - Corrections are recorded in `audit_events` rather than silently replacing history.
 - Generated files are disposable and must be reproducible from SQLite.
 - Historical CSV files are decommissioned and cannot rebuild or overwrite the database.
+- A player has one position-independent level range in `player_rating_ranges`. The current level uses at most the latest 10 verified matches from the selected competition over the preceding 90 days, crossing tournament editions but never mixing Sarrià with Bogatell. With fewer than 5 eligible matches it stays at the range midpoint; with 5 to 9, missing matches are neutral (0.5). A win scores 1, a draw 0.5 and a loss 0, and the result is always bounded by the configured range.
 
 ## Routine update
 
-Future matches can be entered through **Cargar partido**. The local API writes
+Future matches can be entered through **Guardar partido jugado**. The local API writes
 them directly to SQLite; goal totals determine the score and outcome. Guests
 belong only to that match and are excluded from individual statistics.
 
@@ -188,7 +192,7 @@ matches with fully explicit expected results, making calculation failures easy
 to locate.
 
 The suite covers database integrity, known historical corrections, competition
-isolation, query arithmetic, tournaments, pairs, trios, verification rules,
+isolation, query arithmetic, tournament creation and explicit assignment, pairs, trios, verification rules,
 large-team behavior, goal-derived outcomes, anonymous goals, guests, invalid
 cross-competition players, editing, audit-preserving annulment and the latest-five
 formation policy. A production web build can be checked with:

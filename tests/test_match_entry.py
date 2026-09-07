@@ -58,6 +58,22 @@ class MatchEntryWorkflowTests(unittest.TestCase):
             "SELECT COUNT(*) FROM match_goals WHERE match_id=?", (match_id,)
         ).fetchone()[0])
 
+    def test_guest_goals_count_for_score_but_never_for_a_player(self):
+        payload = self.payload()
+        payload["goals"] = [{"teamNo": 2, "guestName": "Invitado 1", "count": 3}]
+        match_id = save_match(self.connection, payload)
+        goal = self.connection.execute(
+            "SELECT player_id, guest_id, goal_count FROM match_goals WHERE match_id=?",
+            (match_id,),
+        ).fetchone()
+        self.assertIsNone(goal["player_id"])
+        self.assertIsNotNone(goal["guest_id"])
+        self.assertEqual(3, goal["goal_count"])
+        score = self.connection.execute(
+            "SELECT score_team1, score_team2 FROM matches WHERE id=?", (match_id,)
+        ).fetchone()
+        self.assertEqual((0, 3), tuple(score))
+
     def test_update_replaces_old_rosters_and_recalculates_the_result(self):
         match_id = save_match(self.connection, self.payload())
         update = {
@@ -115,6 +131,17 @@ class MatchEntryWorkflowTests(unittest.TestCase):
         self.assertEqual(5, len(lineups))
         self.assertEqual(lineup_id, lineups[0]["id"])
         self.assertEqual(sarria_before, recent_lineups(self.connection, "sarria"))
+
+    def test_recent_lineup_preserves_temporary_guests(self):
+        lineup_id = save_lineup(self.connection, "bogatell", [
+            [{"playerId": self.players[0]}, {"guestName": "Invitado 1", "level": 6.5, "position": "Portero"}],
+            [{"playerId": self.players[1]}],
+        ])
+        lineup = recent_lineups(self.connection, "bogatell")[0]
+        self.assertEqual(lineup_id, lineup["id"])
+        self.assertEqual("Invitado 1", lineup["guest1"][0]["guest_label"])
+        self.assertEqual(6.5, lineup["guest1"][0]["level"])
+        self.assertEqual("Portero", lineup["guest1"][0]["primary_position"])
 
     def test_void_is_audited_and_cannot_be_repeated(self):
         match_id = save_match(self.connection, self.payload())
