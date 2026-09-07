@@ -3,7 +3,8 @@ import SiteClient from '@/components/site-client';
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ competition?: string }>;
+  searchParams: Promise<{ competition?: string; view?: string }>;
 }) {
-  return <SiteClient requestedCompetition={(await searchParams).competition} />;
+  const params = await searchParams;
+  return <SiteClient requestedCompetition={params.competition} requestedView={params.view} />;
 }

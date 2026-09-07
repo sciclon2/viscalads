@@ -24,7 +24,7 @@ class DatabaseTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_database_audit(self):
-        self.assertEqual([], audit(self.connection, expected_matches=177))
+        self.assertEqual([], audit(self.connection, expected_matches=184))
 
     def test_2026_external_reconciliation(self):
         march = self.connection.execute(
@@ -60,6 +60,38 @@ class DatabaseTests(unittest.TestCase):
         )]
         self.assertEqual(["Sergio"], august)
 
+    def test_alejandro_and_alejandro_solis_are_distinct_and_scoped(self):
+        rows = self.connection.execute(
+            "SELECT p.canonical_name, c.slug, COUNT(mp.match_id) AS matches "
+            "FROM players p JOIN competition_players cp ON cp.player_id=p.id "
+            "JOIN competitions c ON c.id=cp.competition_id "
+            "LEFT JOIN match_players mp ON mp.player_id=p.id "
+            "WHERE p.canonical_name IN ('Alejandro', 'Alejandro Solís') "
+            "GROUP BY p.id, c.slug ORDER BY p.canonical_name"
+        ).fetchall()
+        self.assertEqual(
+            [("Alejandro", "sarria", 4), ("Alejandro Solís", "bogatell", 2)],
+            [tuple(row) for row in rows],
+        )
+        aliases = dict(self.connection.execute(
+            "SELECT pa.alias, p.canonical_name FROM player_aliases pa "
+            "JOIN players p ON p.id=pa.player_id WHERE lower(pa.alias) IN ('ale', 'alejandro')"
+        ).fetchall())
+        self.assertEqual({"Ale": "Alejandro", "Alejandro": "Alejandro"}, aliases)
+        profiles = {
+            row["canonical_name"]: (row["position"], row["min_rating"], row["max_rating"])
+            for row in self.connection.execute(
+                "SELECT p.canonical_name, pp.position, pr.min_rating, pr.max_rating "
+                "FROM players p JOIN player_positions pp ON pp.player_id=p.id AND pp.priority=1 "
+                "JOIN player_rating_ranges pr ON pr.player_id=p.id "
+                "WHERE p.canonical_name IN ('Alejandro', 'Alejandro Solís')"
+            )
+        }
+        self.assertEqual("Portero", profiles["Alejandro"][0])
+        self.assertLess(profiles["Alejandro"][1], profiles["Alejandro"][2])
+        self.assertEqual("Mediocampo por izquierda", profiles["Alejandro Solís"][0])
+        self.assertLess(profiles["Alejandro Solís"][1], profiles["Alejandro Solís"][2])
+
     def test_all_2026_matches_have_exact_scores(self):
         missing = self.connection.execute(
             "SELECT played_on FROM matches WHERE played_on >= '2026-01-01' "
@@ -74,7 +106,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual("data/sciclon2.sqlite3", payload["generatedFrom"])
         self.assertEqual(["sarria", "bogatell"], [item["slug"] for item in payload["competitions"]])
         self.assertEqual(126, len(payload["competitionStats"]["sarria"]["games"]))
-        self.assertEqual(51, len(payload["competitionStats"]["bogatell"]["games"]))
+        self.assertEqual(58, len(payload["competitionStats"]["bogatell"]["games"]))
 
     def test_competition_histories_are_isolated(self):
         counts = dict(self.connection.execute(
@@ -82,13 +114,40 @@ class DatabaseTests(unittest.TestCase):
             "LEFT JOIN tournaments t ON t.competition_id=c.id "
             "LEFT JOIN matches m ON m.tournament_id=t.id GROUP BY c.slug"
         ).fetchall())
-        self.assertEqual({"sarria": 126, "bogatell": 51}, counts)
+        self.assertEqual({"sarria": 126, "bogatell": 58}, counts)
         wrong_weekday = self.connection.execute(
             "SELECT m.played_on FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
             "JOIN competitions c ON c.id=t.competition_id "
             "WHERE c.slug='bogatell' AND strftime('%w', m.played_on) != '6'"
         ).fetchall()
         self.assertEqual([], wrong_weekday)
+
+    def test_recovered_legacy_bogatell_matches(self):
+        rows = self.connection.execute(
+            "SELECT m.played_on, m.score_team1, m.score_team2, COUNT(mp.player_id) "
+            "FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+            "JOIN competitions c ON c.id=t.competition_id "
+            "JOIN match_players mp ON mp.match_id=m.id "
+            "WHERE c.slug='bogatell' AND m.played_on BETWEEN '2025-03-15' AND '2025-05-31' "
+            "GROUP BY m.id ORDER BY m.played_on"
+        ).fetchall()
+        recovered = [tuple(row) for row in rows if row[0] in {
+            "2025-03-15", "2025-04-19", "2025-04-26",
+            "2025-05-10", "2025-05-24", "2025-05-31",
+        }]
+        self.assertEqual([
+            ("2025-03-15", 3, 6, 16),
+            ("2025-04-19", 3, 4, 12),
+            ("2025-04-26", 2, 5, 13),
+            ("2025-05-10", 6, 4, 16),
+            ("2025-05-24", 2, 4, 15),
+            ("2025-05-31", 2, 1, 16),
+        ], recovered)
+        self.assertIsNone(self.connection.execute(
+            "SELECT m.id FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+            "JOIN competitions c ON c.id=t.competition_id "
+            "WHERE c.slug='bogatell' AND m.played_on='2025-02-15'"
+        ).fetchone())
 
     def test_every_tournament_belongs_to_a_competition(self):
         missing = self.connection.execute(
@@ -134,6 +193,13 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual("1982-01-14", profile["birthDate"])
         self.assertEqual("Argentina", profile["nationality"])
         self.assertEqual("Izquierda", profile["preferredFoot"])
+
+    def test_sergio_has_one_global_rating_range(self):
+        profile = next(p for p in web_payload(self.connection)["profiles"] if p["name"] == "Sergio")
+        self.assertEqual(4.0, profile["rating"]["min"])
+        self.assertEqual(6.5, profile["rating"]["max"])
+        self.assertGreaterEqual(profile["rating"]["current"], 4.0)
+        self.assertLessEqual(profile["rating"]["current"], 6.5)
 
     def test_official_and_alternate_venues_are_scoped(self):
         payload = web_payload(self.connection)

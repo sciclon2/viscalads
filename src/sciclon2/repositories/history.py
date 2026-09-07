@@ -60,15 +60,17 @@ def profiles(connection: sqlite3.Connection) -> list[dict]:
         if row["position"]:
             profile["positions"].append(row["position"])
     memberships = connection.execute(
-        "SELECT cp.player_id, c.slug FROM competition_players cp "
-        "JOIN competitions c ON c.id=cp.competition_id WHERE cp.active=1 "
+        "SELECT cp.player_id, c.slug, cp.active FROM competition_players cp "
+        "JOIN competitions c ON c.id=cp.competition_id "
         "ORDER BY c.id"
     ).fetchall()
     for row in memberships:
         if row["player_id"] in grouped:
-            grouped[row["player_id"]].setdefault("competitions", []).append(row["slug"])
+            key = "competitions" if row["active"] else "inactive_competitions"
+            grouped[row["player_id"]].setdefault(key, []).append(row["slug"])
     for profile in grouped.values():
         profile.setdefault("competitions", [])
+        profile.setdefault("inactive_competitions", [])
     return list(grouped.values())
 
 

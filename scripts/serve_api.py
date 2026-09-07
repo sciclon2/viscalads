@@ -15,6 +15,8 @@ from sciclon2.config import DEFAULT_DB
 from sciclon2.db import connect, migrate
 from sciclon2.services.export import web_payload
 from sciclon2.services.match_entry import recent_lineups, save_lineup, save_match, void_match
+from sciclon2.services.players import create_player, reactivate_player_in_competition, remove_player_from_competition, update_player
+from sciclon2.services.tournaments import create_tournament
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -61,6 +63,14 @@ class Handler(BaseHTTPRequestHandler):
                     item_id = save_lineup(connection, body["competition"], body["teams"])
                 elif self.path == "/api/matches":
                     item_id = save_match(connection, body)
+                elif self.path == "/api/players":
+                    item_id = create_player(connection, body["competition"], body)
+                elif self.path == "/api/tournaments":
+                    item_id = create_tournament(connection, body["competition"], body)
+                elif self.path.startswith("/api/players/") and self.path.endswith("/reactivate"):
+                    player_id = int(self.path.removeprefix("/api/players/").removesuffix("/reactivate"))
+                    reactivate_player_in_competition(connection, player_id, body["competition"])
+                    item_id = player_id
                 else:
                     return self._send({"error": "No encontrado"}, 404)
                 self._send({"id": item_id}, 201)
@@ -69,19 +79,34 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         try:
-            match_id = int(self.path.removeprefix("/api/matches/"))
             with connect(DEFAULT_DB) as connection:
                 migrate(connection)
-                self._send({"id": save_match(connection, self._body(), match_id)})
+                if self.path.startswith("/api/players/"):
+                    player_id = int(self.path.removeprefix("/api/players/"))
+                    update_player(connection, player_id, self._body())
+                    self._send({"id": player_id})
+                elif self.path.startswith("/api/matches/"):
+                    match_id = int(self.path.removeprefix("/api/matches/"))
+                    self._send({"id": save_match(connection, self._body(), match_id)})
+                else:
+                    self._send({"error": "No encontrado"}, 404)
         except (ValueError, KeyError, sqlite3.IntegrityError) as exc:
             self._send({"error": str(exc)}, 400)
 
     def do_DELETE(self):
         try:
-            match_id = int(self.path.removeprefix("/api/matches/"))
+            parsed = urlparse(self.path)
             with connect(DEFAULT_DB) as connection:
                 migrate(connection)
-                void_match(connection, match_id, self._body().get("reason", ""))
+                if parsed.path.startswith("/api/players/"):
+                    player_id = int(parsed.path.removeprefix("/api/players/"))
+                    competition = parse_qs(parsed.query).get("competition", [""])[0]
+                    remove_player_from_competition(connection, player_id, competition)
+                elif parsed.path.startswith("/api/matches/"):
+                    match_id = int(parsed.path.removeprefix("/api/matches/"))
+                    void_match(connection, match_id, self._body().get("reason", ""))
+                else:
+                    return self._send({"error": "No encontrado"}, 404)
             self._send({"ok": True})
         except (ValueError, sqlite3.IntegrityError) as exc:
             self._send({"error": str(exc)}, 400)

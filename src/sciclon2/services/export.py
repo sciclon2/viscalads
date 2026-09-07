@@ -6,6 +6,8 @@ from pathlib import Path
 
 from ..repositories.history import champions, competitions, matches, profiles, venues
 from .statistics import build_statistics
+from .ratings import player_ratings
+from .tournaments import list_tournaments
 
 
 def web_payload(connection: sqlite3.Connection) -> dict:
@@ -29,13 +31,16 @@ def web_payload(connection: sqlite3.Connection) -> dict:
         scoped_stats = build_statistics(scoped_games)
         competition_stats[slug] = {
             **scoped_stats,
+            "ratings": player_ratings(connection, competition=slug),
             "games": [game for game in public_games if game["competition"] == slug],
             "champions": [item for item in champions(connection) if any(
                 game["tournament"] == item["tournament"] for game in scoped_games
             )],
             "venues": [venue for venue in venue_rows if venue["competition"] == slug],
+            "tournamentEditions": list_tournaments(connection, slug),
         }
     profile_rows = profiles(connection)
+    ratings = player_ratings(connection)
     return {
         "generatedFrom": "data/sciclon2.sqlite3",
         "competitions": competition_rows,
@@ -49,13 +54,19 @@ def web_payload(connection: sqlite3.Connection) -> dict:
             "alternate": p["positions"][1] if len(p["positions"]) > 1 else "",
             "notes": p["notes"], "active": p["active"], "photo": p["photo"],
             "competitions": p["competitions"],
+            "inactiveCompetitions": p["inactive_competitions"],
             "firstName": p["first_name"], "lastName": p["last_name"],
             "nickname": p["nickname"], "birthDate": p["birth_date"],
             "nationality": p["nationality"], "preferredFoot": p["preferred_foot"],
             "bio": p["bio"],
+            "rating": ratings.get(p["id"]),
         } for p in profile_rows],
         "tournaments": stats["tournaments"], "pairs": stats["pairs"],
         "trios": stats["trios"], "champions": champions(connection),
+        "funnyFactRules": [dict(row) for row in connection.execute(
+            "SELECT code, title, description, priority, scope FROM funny_fact_rules "
+            "WHERE enabled=1 ORDER BY priority, code"
+        )],
     }
 
 

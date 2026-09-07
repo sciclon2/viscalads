@@ -11,7 +11,20 @@ def _competition_id(connection: sqlite3.Connection, slug: str) -> int:
     return row[0]
 
 
-def _tournament_id(connection: sqlite3.Connection, competition_id: int, played_on: str) -> int:
+def _tournament_id(
+    connection: sqlite3.Connection,
+    competition_id: int,
+    played_on: str,
+    requested_id: int | None = None,
+) -> int:
+    if requested_id is not None:
+        selected = connection.execute(
+            "SELECT id FROM tournaments WHERE id=? AND competition_id=?",
+            (requested_id, competition_id),
+        ).fetchone()
+        if not selected:
+            raise ValueError("El torneo seleccionado no pertenece a esta competición")
+        return int(selected[0])
     row = connection.execute(
         "SELECT id FROM tournaments WHERE competition_id=? "
         "ORDER BY CASE WHEN starts_on<=? AND (ends_on IS NULL OR ends_on>=?) THEN 0 ELSE 1 END, "
@@ -36,34 +49,57 @@ def recent_lineups(connection: sqlite3.Connection, competition: str) -> list[dic
             "JOIN players p ON p.id=glm.player_id WHERE glm.lineup_id=? "
             "ORDER BY glm.team_no, glm.lineup_order", (row["id"],),
         ).fetchall()
+        guests = connection.execute(
+            "SELECT guest_label, team_no, level, primary_position FROM generated_lineup_guests "
+            "WHERE lineup_id=? ORDER BY team_no, lineup_order", (row["id"],),
+        ).fetchall()
         result.append({
             "id": row["id"], "createdAt": row["created_at"],
             "team1": [dict(member) for member in members if member["team_no"] == 1],
             "team2": [dict(member) for member in members if member["team_no"] == 2],
+            "guest1": [dict(guest) for guest in guests if guest["team_no"] == 1],
+            "guest2": [dict(guest) for guest in guests if guest["team_no"] == 2],
         })
     return result
 
 
-def save_lineup(connection: sqlite3.Connection, competition: str, teams: list[list[int]]) -> int:
+def save_lineup(connection: sqlite3.Connection, competition: str, teams: list[list]) -> int:
     competition_id = _competition_id(connection, competition)
-    player_ids = [player_id for team in teams for player_id in team]
-    if len(teams) != 2 or not player_ids or len(player_ids) != len(set(player_ids)):
+    if len(teams) != 2 or not any(teams):
+        raise ValueError("La formación debe tener dos equipos")
+    normalized = [
+        [member if isinstance(member, dict) else {"playerId": member} for member in team]
+        for team in teams
+    ]
+    player_ids = [int(member["playerId"]) for team in normalized for member in team if member.get("playerId")]
+    guest_labels = [str(member.get("guestName", "")).strip() for team in normalized for member in team if not member.get("playerId")]
+    if len(player_ids) != len(set(player_ids)) or any(not label for label in guest_labels) or len(guest_labels) != len(set(guest_labels)):
         raise ValueError("La formación debe tener dos equipos sin jugadores repetidos")
-    known = connection.execute(
-        f"SELECT COUNT(*) FROM players WHERE id IN ({','.join('?' for _ in player_ids)})", player_ids
-    ).fetchone()[0]
-    if known != len(player_ids):
-        raise ValueError("La formación contiene jugadores desconocidos")
+    if player_ids:
+        known = connection.execute(
+            f"SELECT COUNT(*) FROM players WHERE id IN ({','.join('?' for _ in player_ids)})", player_ids
+        ).fetchone()[0]
+        if known != len(player_ids):
+            raise ValueError("La formación contiene jugadores desconocidos")
     cursor = connection.execute(
         "INSERT INTO generated_lineups(competition_id) VALUES (?)", (competition_id,)
     )
     lineup_id = cursor.lastrowid
-    for team_no, team in enumerate(teams, 1):
-        connection.executemany(
-            "INSERT INTO generated_lineup_members(lineup_id, player_id, team_no, lineup_order) "
-            "VALUES (?, ?, ?, ?)",
-            [(lineup_id, player_id, team_no, order) for order, player_id in enumerate(team, 1)],
-        )
+    for team_no, team in enumerate(normalized, 1):
+        for order, member in enumerate(team, 1):
+            if member.get("playerId"):
+                connection.execute(
+                    "INSERT INTO generated_lineup_members(lineup_id, player_id, team_no, lineup_order) VALUES (?, ?, ?, ?)",
+                    (lineup_id, int(member["playerId"]), team_no, order),
+                )
+            else:
+                level = float(member.get("level", 5))
+                if level < 1 or level > 10:
+                    raise ValueError("El nivel del invitado debe estar entre 1 y 10")
+                connection.execute(
+                    "INSERT INTO generated_lineup_guests(lineup_id, guest_label, team_no, lineup_order, level, primary_position) VALUES (?, ?, ?, ?, ?, ?)",
+                    (lineup_id, str(member["guestName"]).strip(), team_no, order, level, str(member.get("position", "")).strip() or None),
+                )
     stale = connection.execute(
         "SELECT id FROM generated_lineups WHERE competition_id=? "
         "ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET 5", (competition_id,),
@@ -81,7 +117,13 @@ def save_match(connection: sqlite3.Connection, payload: dict, match_id: int | No
     except ValueError as exc:
         raise ValueError("La fecha no es válida") from exc
     competition_id = _competition_id(connection, str(payload.get("competition", "")))
-    tournament_id = _tournament_id(connection, competition_id, played_on)
+    requested_tournament = payload.get("tournamentId")
+    tournament_id = _tournament_id(
+        connection,
+        competition_id,
+        played_on,
+        int(requested_tournament) if requested_tournament not in (None, "") else None,
+    )
     teams = payload.get("teams")
     if not isinstance(teams, list) or len(teams) != 2 or any(not team for team in teams):
         raise ValueError("Ambos equipos necesitan participantes")
