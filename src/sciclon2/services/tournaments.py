@@ -19,24 +19,43 @@ def list_tournaments(connection: sqlite3.Connection, competition: str) -> list[d
     ).fetchall()
     result = []
     for row in rows:
-        champions = [item[0] for item in connection.execute(
-            "SELECT p.canonical_name FROM tournament_champions tc "
-            "JOIN players p ON p.id=tc.player_id WHERE tc.tournament_id=? ORDER BY p.canonical_name",
-            (row["id"],),
+        champions = calculated_tournament_champions(connection, row["id"])
+        rules = [dict(item) for item in connection.execute(
+            "SELECT rule_code AS code, threshold_value AS threshold, "
+            "points_delta AS pointsDelta, description FROM tournament_rules "
+            "WHERE tournament_id=? ORDER BY id", (row["id"],)
         )]
         result.append({
             "id": row["id"], "code": row["code"], "displayName": row["display_name"],
             "startsOn": row["starts_on"] or row["first_match"],
-            "endsOn": row["ends_on"] or row["last_match"],
+            "endsOn": row["ends_on"],
             "matchdayCount": row["matchday_count"] or row["played_dates"],
             "matchCount": row["match_count"], "champions": champions,
+            "rules": rules,
+            "standings": tournament_standings(connection, row["id"]),
         })
     return result
+
+
+def calculated_tournament_champions(connection: sqlite3.Connection, tournament_id: int) -> list[str]:
+    """Return every points leader; the historical table is only an audit reference."""
+    table = tournament_standings(connection, tournament_id)
+    if not table:
+        return []
+    winning_points = max(item["totalPoints"] for item in table)
+    return sorted(item["name"] for item in table if item["totalPoints"] == winning_points)
 
 
 def create_tournament(connection: sqlite3.Connection, competition: str, payload: dict) -> int:
     name = str(payload.get("displayName", "")).strip()
     starts_on = str(payload.get("startsOn", "")).strip()
+    # Keep the original boolean payload working for older web clients while the
+    # rule code makes the creation contract extensible for future rule presets.
+    rule_code = payload.get("ruleCode")
+    if rule_code is None:
+        rule_code = "goal_margin_loss" if bool(payload.get("goalMarginPenalty", False)) else "none"
+    if rule_code not in {"none", "goal_margin_loss", "goal_margin_both"}:
+        raise ValueError("Regla de torneo no válida")
     try:
         matchday_count = int(payload.get("matchdayCount", 0))
     except (TypeError, ValueError):
@@ -71,8 +90,92 @@ def create_tournament(connection: sqlite3.Connection, competition: str, payload:
         "INSERT INTO tournaments(code, display_name, starts_on, ends_on, competition_id, matchday_count) VALUES (?,?,?,?,?,?)",
         (code, name, starts_on, ends_on, competition_row[0], matchday_count),
     )
+    if rule_code == "goal_margin_loss":
+        connection.execute(
+            "INSERT INTO tournament_rules(tournament_id, rule_code, threshold_value, points_delta, description) "
+            "VALUES (?, 'goal_margin_loss', 3, -1, '−1 punto por perder por una diferencia de 3 goles o más')",
+            (cursor.lastrowid,),
+        )
+    elif rule_code == "goal_margin_both":
+        connection.execute(
+            "INSERT INTO tournament_rules(tournament_id, rule_code, threshold_value, points_delta, description) "
+            "VALUES (?, 'goal_margin_both', 3, 1, '+1 al ganador y -1 al perdedor por cada 3 goles de diferencia')",
+            (cursor.lastrowid,),
+        )
     connection.execute(
         "INSERT INTO audit_events(entity_type, entity_id, action, new_value, reason) VALUES ('tournament', ?, 'create', ?, 'Creado desde la interfaz')",
         (cursor.lastrowid, name),
     )
     return int(cursor.lastrowid)
+
+
+def tournament_standings(connection: sqlite3.Connection, tournament_id: int) -> list[dict]:
+    """Calculate tournament-only points, including the tournament's immutable rules."""
+    rules = connection.execute(
+        "SELECT rule_code, threshold_value, points_delta FROM tournament_rules WHERE tournament_id=?",
+        (tournament_id,),
+    ).fetchall()
+    rule_by_code = {row["rule_code"]: row for row in rules}
+    matches = connection.execute(
+        "SELECT id, outcome, score_team1, score_team2 FROM matches "
+        "WHERE tournament_id=? AND voided_at IS NULL AND coverage_status='verified' "
+        "AND outcome IN ('1','2','D') ORDER BY played_on, id",
+        (tournament_id,),
+    ).fetchall()
+    rows: dict[int, dict] = {}
+    for match in matches:
+        players = connection.execute(
+            "SELECT mp.player_id, mp.team_no, p.canonical_name FROM match_players mp "
+            "JOIN players p ON p.id=mp.player_id WHERE mp.match_id=?",
+            (match["id"],),
+        ).fetchall()
+        margin_rule = rule_by_code.get("goal_margin_loss")
+        both_margin_rule = rule_by_code.get("goal_margin_both")
+        exact_margin = (
+            abs(match["score_team1"] - match["score_team2"])
+            if match["score_team1"] is not None and match["score_team2"] is not None
+            else None
+        )
+        for player in players:
+            item = rows.setdefault(player["player_id"], {
+                "playerId": player["player_id"], "name": player["canonical_name"],
+                "played": 0, "wins": 0, "draws": 0, "losses": 0,
+                "goals": 0, "bonusMatches": 0, "positivePoints": 0,
+                "penalizedMatches": 0, "negativePoints": 0,
+            })
+            item["played"] += 1
+            team = str(player["team_no"])
+            if match["outcome"] == "D":
+                item["draws"] += 1
+            elif match["outcome"] == team:
+                item["wins"] += 1
+                if both_margin_rule and exact_margin is not None:
+                    bonus = exact_margin // int(both_margin_rule["threshold_value"])
+                    if bonus:
+                        item["bonusMatches"] += 1
+                        item["positivePoints"] += bonus * int(both_margin_rule["points_delta"])
+            else:
+                item["losses"] += 1
+                if both_margin_rule and exact_margin is not None:
+                    penalty = exact_margin // int(both_margin_rule["threshold_value"])
+                    if penalty:
+                        item["penalizedMatches"] += 1
+                        item["negativePoints"] -= penalty * int(both_margin_rule["points_delta"])
+                elif margin_rule and exact_margin is not None and exact_margin >= margin_rule["threshold_value"]:
+                    item["penalizedMatches"] += 1
+                    item["negativePoints"] += int(margin_rule["points_delta"])
+    goals = connection.execute(
+        "SELECT mg.player_id, SUM(mg.goal_count) goals FROM match_goals mg "
+        "JOIN matches m ON m.id=mg.match_id WHERE m.tournament_id=? "
+        "AND m.voided_at IS NULL AND mg.player_id IS NOT NULL GROUP BY mg.player_id",
+        (tournament_id,),
+    ).fetchall()
+    for goal in goals:
+        if goal["player_id"] in rows:
+            rows[goal["player_id"]]["goals"] = int(goal["goals"])
+    result = []
+    for item in rows.values():
+        item["basePoints"] = item["wins"] * 3 + item["draws"]
+        item["totalPoints"] = item["basePoints"] + item["positivePoints"] + item["negativePoints"]
+        result.append(item)
+    return sorted(result, key=lambda item: (-item["totalPoints"], -item["wins"], item["played"], item["name"].lower()))

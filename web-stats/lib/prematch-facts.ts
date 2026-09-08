@@ -35,13 +35,14 @@ export function prematchFacts(
   stats: PlayerStat[],
   rules: FactRule[],
   globalGames: Game[] = games,
+  selectedTournament?: string,
 ): PrematchFact[] {
   const enabled = new Set(rules.map((rule) => rule.code));
   const title = (code: string) => rules.find((rule) => rule.code === code)?.title ?? code;
   const facts: PrematchFact[] = [];
   const verified = globalGames.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
   const competitionGames = games.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
-  const currentTournament = [...competitionGames].reverse().find((game) => game.tournament)?.tournament;
+  const currentTournament = selectedTournament || [...competitionGames].reverse().find((game) => game.tournament)?.tournament;
 
   if (currentTournament) {
     const tournamentGames = competitionGames.filter((game) => game.tournament === currentTournament);
@@ -56,7 +57,7 @@ export function prematchFacts(
     if (enabled.has('tournament_winless') && winless)
       facts.push({ code: 'tournament_winless', title: title('tournament_winless'), scope: 'competition', text: `${winless.name} todavía no ganó en ${currentTournament} tras ${winless.results.length} partidos. Este puede ser el día de cortar la espera.` });
     if (enabled.has('leader_clash')) {
-      const tournamentState = currentTournamentLeaders(competitionGames);
+      const tournamentState = currentTournamentLeaders(tournamentGames);
       const leaders = tournamentState.leaders.slice(0, 2);
       if (tournamentState.matchDays >= 3 && leaders.length === 2 && inProposedOppositeTeams(leaders[0][0], leaders[1][0], teamA, teamB))
         facts.push({ code: 'leader_clash', title: title('leader_clash'), scope: 'competition', text: `${leaders[0][0]} (${leaders[0][1]} pts) y ${leaders[1][0]} (${leaders[1][1]} pts), los dos primeros de ${currentTournament}, quedaron enfrentados directamente.` });

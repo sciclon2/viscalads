@@ -1,8 +1,10 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
+  BarChart3,
+  CalendarRange,
   ClipboardPlus,
   Crown,
   Clock,
@@ -42,6 +44,7 @@ import { TeamBuilder } from '@/components/team-builder';
 import { MatchEntry } from '@/components/match-entry';
 import { PlayersSection } from '@/components/players-section';
 import { TournamentsSection } from '@/components/tournaments-section';
+import { TournamentStandings } from '@/components/tournament-standings';
 import { PlayerAvatar, PlayerName } from '@/components/player-avatar';
 import {
   Dialog,
@@ -75,15 +78,17 @@ type FormRow = RecordRow & {
 };
 type Metric = 'effectiveness' | 'played' | 'wins' | 'losses' | 'points';
 type CompetitionId = string;
-type Workspace = 'stats' | 'players' | 'builder' | 'create' | 'admin' | 'tournaments';
+type Workspace = 'home' | 'stats' | 'players' | 'builder' | 'create' | 'admin' | 'tournaments' | 'standings';
 type ViewId = Workspace | 'venues';
 const validViews = new Set<ViewId>([
+  'home',
   'stats',
   'players',
   'builder',
   'create',
   'admin',
   'tournaments',
+  'standings',
   'venues',
 ]);
 const metricLabels: Record<Metric, string> = {
@@ -143,7 +148,7 @@ export default function StatsDashboard({
     useState<CompetitionId>(initialCompetition);
   const startingView = validViews.has(initialView as ViewId)
     ? (initialView as ViewId)
-    : 'stats';
+    : 'home';
   const [workspace, setWorkspace] = useState<Workspace>(
     startingView === 'venues' ? 'stats' : startingView,
   );
@@ -163,6 +168,7 @@ export default function StatsDashboard({
       data.profiles.map((profile) => ({
         ...profile,
         rating: scope.ratings[String(profile.id)] ?? null,
+        consecutiveAppearances: scope.appearanceStreaks?.[String(profile.id)] ?? 0,
       })),
     [data.profiles, scope.ratings],
   );
@@ -220,10 +226,9 @@ export default function StatsDashboard({
       .map((profile) => ({ profile, stats: statsByName.get(profile.name) }))
       .filter(({ stats }) => stats && stats.played >= minimum && stats.played <= maximum)
       .sort((a, b) => {
-        const av = a.profile.rating?.current ?? 0;
-        const bv = b.profile.rating?.current ?? 0;
+        const av = a.profile.rating?.formScore ?? 0.5;
+        const bv = b.profile.rating?.formScore ?? 0.5;
         return (direction === 'best' ? bv - av : av - bv) ||
-          (b.profile.rating?.formScore ?? 0.5) - (a.profile.rating?.formScore ?? 0.5) ||
           a.profile.name.localeCompare(b.profile.name);
       });
   }, [scope.players, scopedProfiles, competition, minimum, maximum, direction]);
@@ -271,8 +276,7 @@ export default function StatsDashboard({
     setWorkspace(view === 'venues' ? 'stats' : view);
     if (view === 'venues') setQuery('venues');
     const url = new URL(window.location.href);
-    if (view === 'stats') url.searchParams.delete('view');
-    else url.searchParams.set('view', view);
+    url.searchParams.set('view', view);
     window.history[replace ? 'replaceState' : 'pushState']({}, '', url);
   };
 
@@ -281,7 +285,7 @@ export default function StatsDashboard({
       const value = new URL(window.location.href).searchParams.get(
         'view',
       ) as ViewId | null;
-      const view = value && validViews.has(value) ? value : 'stats';
+      const view = value && validViews.has(value) ? value : 'home';
       setWorkspace(view === 'venues' ? 'stats' : view);
       if (view === 'venues') setQuery('venues');
     };
@@ -296,7 +300,7 @@ export default function StatsDashboard({
     >
       <div className="pitch-lines" aria-hidden="true" />
       <header className="relative border-b border-white/10 bg-[#101b16]/95 text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="grid size-11 place-items-center rounded-full border-2 border-[#d8ff4f] bg-[#1f382b] text-xl">
               ⚽
@@ -308,7 +312,7 @@ export default function StatsDashboard({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="header-actions flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => window.location.assign('/')}
@@ -317,68 +321,6 @@ export default function StatsDashboard({
             >
               <Home className="size-4" />
               <span>Inicio</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                navigateTo('venues');
-                window.requestAnimationFrame(() =>
-                  document.getElementById('stats-panel')?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start',
-                  }),
-                );
-              }}
-              className="header-home"
-              aria-label="Ver canchas"
-            >
-              <MapPin className="size-4" />
-              <span>Canchas</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('tournaments')}
-              className="header-home"
-              aria-label="Ver y administrar torneos"
-            >
-              <Trophy className="size-4" />
-              <span>Torneos</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('players')}
-              className="header-home"
-              aria-label="Ver y administrar jugadores"
-            >
-              <UsersRound className="size-4" />
-              <span>Jugadores</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('builder')}
-              className="header-home"
-              aria-label="Armar equipos"
-            >
-              <UsersRound className="size-4" />
-              <span>Armar equipos</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('create')}
-              className="header-home"
-              aria-label="Guardar partido jugado"
-            >
-              <ClipboardPlus className="size-4" />
-              <span>Guardar partido</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('admin')}
-              className="header-home"
-              aria-label="Administrar partidos"
-            >
-              <ListChecks className="size-4" />
-              <span>Partidos</span>
             </button>
             <select
               aria-label="Competición"
@@ -436,7 +378,9 @@ export default function StatsDashboard({
             </div>
           )}
         </div>
-        <Card
+        {workspace === 'home' ? (
+          <CompetitionHub competition={competition} navigateTo={navigateTo} />
+        ) : <Card
           id="stats-panel"
           className="scroll-mt-4 border-0 bg-[#f7f4eb]/95 shadow-[0_24px_70px_rgba(20,40,28,.16)] ring-1 ring-[#173d2a]/15"
         >
@@ -454,6 +398,8 @@ export default function StatsDashboard({
                           ? 'Administrar partidos'
                           : workspace === 'tournaments'
                             ? 'Torneos'
+                            : workspace === 'standings'
+                              ? 'Tabla de posiciones'
                           : selected.label}
                 </CardTitle>
                 {workspace === 'stats' && (
@@ -476,47 +422,50 @@ export default function StatsDashboard({
                         ? 'Corregí o anulá partidos ya guardados.'
                         : workspace === 'tournaments'
                           ? 'Consultá las ediciones anteriores o creá un nuevo torneo.'
+                          : workspace === 'standings'
+                            ? 'Elegí un torneo y revisá sus puntos, goles y penalizaciones.'
                         : selected.description}
               </CardDescription>
             </div>
-            {workspace !== 'stats' ? (
-              <button
-                type="button"
-                onClick={() => navigateTo('stats')}
-                className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
-              >
-                <ArrowLeft className="size-4" />
-                Volver a estadísticas
-              </button>
-            ) : query === 'venues' ? (
+            {workspace === 'stats' && query !== 'venues' ? (
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-2 lg:mt-0">
+                <select
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value as QueryId);
+                    void onDataChanged();
+                  }}
+                  className="h-10 min-w-64 rounded-md border bg-white px-3"
+                >
+                  {queries
+                    .filter((item) => item.id !== 'venues')
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => navigateTo('home')}
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8]"
+                >
+                  <ArrowLeft className="size-4" />
+                  Volver al panel
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={() => {
-                  setQuery('players');
-                  navigateTo('stats');
+                  if (query === 'venues') setQuery('players');
+                  navigateTo('home');
                 }}
                 className="mt-4 inline-flex h-10 items-center gap-2 rounded-md border border-[#173d2a]/20 bg-white px-4 text-sm font-bold text-[#173d2a] transition hover:bg-[#edf3e8] lg:mt-0"
               >
                 <ArrowLeft className="size-4" />
-                Volver a estadísticas
+                Volver al panel
               </button>
-            ) : (
-              <select
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value as QueryId);
-                  void onDataChanged();
-                }}
-                className="mt-4 h-10 min-w-64 rounded-md border bg-white px-3 lg:mt-0"
-              >
-                {queries
-                  .filter((item) => item.id !== 'venues')
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-              </select>
             )}
           </CardHeader>
           <CardContent className="pt-5">
@@ -526,6 +475,7 @@ export default function StatsDashboard({
                 profiles={scopedProfiles}
                 stats={scope.players}
                 games={games}
+                tournaments={scope.tournamentEditions}
                 onSaved={onDataChanged}
               />
             ) : workspace === 'tournaments' ? (
@@ -535,14 +485,18 @@ export default function StatsDashboard({
                 games={games}
                 onSaved={onDataChanged}
               />
+            ) : workspace === 'standings' ? (
+              <TournamentStandings tournaments={scope.tournamentEditions} />
             ) : workspace === 'builder' ? (
               <TeamBuilder
+                key={competition}
                 games={games}
                 globalGames={data.games}
                 competition={competition}
                 profiles={scopedProfiles}
                 stats={scope.players}
                 funnyFactRules={data.funnyFactRules}
+                tournaments={scope.tournamentEditions}
               />
             ) : workspace !== 'stats' ? (
               <MatchEntry
@@ -670,13 +624,35 @@ export default function StatsDashboard({
               </>
             )}
           </CardContent>
-        </Card>
+        </Card>}
         <p className="mt-4 text-center text-sm text-[#476052]">
           3 puntos por victoria · 1 por empate · amistosos y cancelados fuera ·
           datos guardados solo en este laptop
         </p>
       </section>
     </main>
+  );
+}
+
+function CompetitionHub({ competition, navigateTo }: { competition: string; navigateTo: (view: ViewId) => void }) {
+  const sections: Array<{ title: string; description: string; icon: ReactNode; actions: Array<[string, ViewId]> }> = [
+    { title: 'Estadísticas', description: 'Rankings, rachas, duplas, comparaciones y todos los números.', icon: <BarChart3 className="size-7" />, actions: [['Explorar estadísticas', 'stats']] },
+    { title: 'Competición', description: 'Tabla de posiciones, reglas, torneos actuales e históricos.', icon: <Trophy className="size-7" />, actions: [['Ver posiciones', 'standings'], ['Administrar torneos', 'tournaments']] },
+    { title: 'Día de partido', description: 'Prepará equipos equilibrados y registrá lo que pasó en la cancha.', icon: <CalendarRange className="size-7" />, actions: [['Armar equipos', 'builder'], ['Guardar partido', 'create'], ['Ver partidos', 'admin']] },
+    { title: 'Comunidad', description: 'Fichas de jugadores, niveles, posiciones y lugares donde jugamos.', icon: <UsersRound className="size-7" />, actions: [['Ver jugadores', 'players'], ['Ver canchas', 'venues']] },
+  ];
+  return (
+    <section className="rounded-3xl border border-[#173d2a]/15 bg-[#f7f4eb]/95 p-5 shadow-[0_24px_70px_rgba(20,40,28,.16)] sm:p-8">
+      <div className="mb-6"><p className="text-xs font-bold uppercase tracking-[.18em] text-[#347a52]">Panel de {competition === 'sarria' ? 'Sarrià' : 'Bogatell'}</p><h2 className="mt-1 font-display text-3xl">¿Qué querés hacer?</h2></div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {sections.map((section) => (
+          <article key={section.title} className="rounded-2xl border border-[#173d2a]/12 bg-white p-5 shadow-sm">
+            <div className="flex items-start gap-4"><span className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#e8f0e3] text-[#173d2a]">{section.icon}</span><div><h3 className="font-display text-2xl">{section.title}</h3><p className="mt-1 text-sm text-muted-foreground">{section.description}</p></div></div>
+            <div className="mt-5 flex flex-wrap gap-2">{section.actions.map(([name, view], index) => <button key={view} type="button" onClick={() => navigateTo(view)} className={index === 0 ? 'rounded-lg bg-[#173d2a] px-3 py-2 text-sm font-bold text-white' : 'rounded-lg border border-[#173d2a]/20 px-3 py-2 text-sm font-bold text-[#173d2a] hover:bg-[#edf3e8]'}>{name}</button>)}</div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -693,8 +669,6 @@ function CurrentRanking({
             <TableHead className="w-12 text-white">#</TableHead>
             <TableHead className="text-white">Jugador</TableHead>
             <TableHead className="text-right text-white">PJ total</TableHead>
-            <TableHead className="text-right text-white">PJ válidos</TableHead>
-            <TableHead className="text-right text-white">Nivel actual</TableHead>
             <TableHead className="text-right text-white">Momento</TableHead>
           </TableRow>
         </TableHeader>
@@ -709,8 +683,6 @@ function CurrentRanking({
                 </span>
               </TableCell>
               <TableCell className="text-right">{stats?.played ?? 0}</TableCell>
-              <TableCell className="text-right">{profile.rating?.recentMatches ?? 0}</TableCell>
-              <TableCell className="text-right font-bold">{profile.rating?.current.toFixed(2) ?? '—'}</TableCell>
               <TableCell className="text-right">
                 <span className="eff-pill">{Math.round((profile.rating?.formScore ?? 0.5) * 100)}%</span>
               </TableCell>

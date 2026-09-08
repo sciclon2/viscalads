@@ -31,6 +31,9 @@ class RatingTests(unittest.TestCase):
         self.connection.execute("INSERT INTO matches VALUES (?, ?, ?, 'verified', 1)", (match_id, played_on, outcome))
         self.connection.execute("INSERT INTO match_players VALUES (?, 1, ?)", (match_id, team_no))
 
+    def add_absence(self, match_id: int, played_on: str):
+        self.connection.execute("INSERT INTO matches VALUES (?, ?, '1', 'verified', 1)", (match_id, played_on))
+
     def test_fewer_than_five_recent_matches_use_midpoint(self):
         for index in range(4):
             self.add(index + 1, f"2026-08-{20 + index:02d}", "1")
@@ -59,6 +62,28 @@ class RatingTests(unittest.TestCase):
         rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
+
+    def test_three_consecutive_absences_reduce_form_by_ten_percentage_points(self):
+        for index in range(5):
+            self.add(index + 1, f"2026-08-{10 + index:02d}", "1")
+        for index in range(3):
+            self.add_absence(index + 10, f"2026-08-{20 + index:02d}")
+        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
+        self.assertTrue(rating["absencePenalty"])
+        self.assertEqual(3, rating["missedMatches"])
+        self.assertEqual(10, rating["absencePenaltyPercent"])
+        self.assertEqual(0.75, rating["formScore"])
+        self.assertEqual(5.88, rating["current"])
+
+    def test_two_consecutive_absences_do_not_apply_penalty(self):
+        for index in range(5):
+            self.add(index + 1, f"2026-08-{10 + index:02d}", "1")
+        for index in range(2):
+            self.add_absence(index + 10, f"2026-08-{20 + index:02d}")
+        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
+        self.assertFalse(rating["absencePenalty"])
+        self.assertEqual(2, rating["missedMatches"])
+        self.assertEqual(0.85, rating["formScore"])
 
     def test_only_latest_ten_matches_are_used(self):
         for index in range(12):
