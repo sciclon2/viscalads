@@ -17,6 +17,7 @@ from sciclon2.services.export import web_payload
 from sciclon2.services.match_entry import recent_lineups, save_lineup, save_match, void_match
 from sciclon2.services.players import create_player, reactivate_player_in_competition, remove_player_from_competition, update_player
 from sciclon2.services.tournaments import create_tournament
+from sciclon2.services.whatsapp_lineup import parse_whatsapp_lineup
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -26,6 +27,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "http://localhost:3000")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
     def _send(self, value, status=200):
@@ -61,6 +63,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._body()
                 if self.path == "/api/lineups":
                     item_id = save_lineup(connection, body["competition"], body["teams"])
+                elif self.path == "/api/lineups/parse":
+                    return self._send(parse_whatsapp_lineup(connection, body["competition"], body["text"]))
                 elif self.path == "/api/matches":
                     item_id = save_match(connection, body)
                 elif self.path == "/api/players":

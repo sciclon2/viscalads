@@ -1,0 +1,3 @@
+-- Superseded reconstruction draft retained as a no-op because this version was
+-- briefly observed by a running local API. Migration 029 restores the verified
+-- 18 September score and preserves only evidence-backed corrections.

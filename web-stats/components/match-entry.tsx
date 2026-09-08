@@ -6,6 +6,7 @@ import { API } from '@/components/site-client';
 import { PlayerAvatar } from '@/components/player-avatar';
 import { PitchMarkings } from '@/components/pitch-markings';
 import type { CompetitionStats, Game, Profile } from '@/lib/stats-context';
+import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
 import { bestFormation, pitchPosition } from '@/lib/team-formation';
 
 type Member = { playerId?: number; name: string; guestName?: string };
@@ -38,8 +39,12 @@ export function MatchEntry({
     () =>
       profiles
         .filter((profile) => profile.competitions.includes(competition))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [profiles, competition],
+        .sort((a, b) =>
+          Number(hasRecentActivity(b.name, games, activityCutoff())) -
+            Number(hasRecentActivity(a.name, games, activityCutoff())) ||
+          a.name.localeCompare(b.name),
+        ),
+    [profiles, competition, games],
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const currentTournament = useMemo(() => {
@@ -64,7 +69,7 @@ export function MatchEntry({
       setPresets([]);
       return;
     }
-    fetch(`${API}/lineups?competition=${competition}`)
+    fetch(`${API}/lineups?competition=${competition}`, { cache: 'no-store' })
       .then(async (r) => (await r.json()) as Preset[])
       .then(setPresets)
       .catch(() => setPresets([]));

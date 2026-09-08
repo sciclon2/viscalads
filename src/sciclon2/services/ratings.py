@@ -8,6 +8,8 @@ MIN_MATCHES = 5
 MAX_MATCHES = 10
 NEUTRAL_SCORE = 0.5
 FORM_CONTRAST = 1.4
+ABSENCE_THRESHOLD = 3
+ABSENCE_PENALTY = 0.1
 
 
 def player_ratings(
@@ -22,13 +24,35 @@ def player_ratings(
         "SELECT player_id, min_rating, max_rating FROM player_rating_ranges"
     ).fetchall()
     ratings: dict[int, dict] = {}
+    competition_clause = "AND c.slug=? " if competition else ""
+    match_parameters: list[object] = [reference.isoformat()]
+    if competition:
+        match_parameters.append(competition)
+    recent_match_rows = connection.execute(
+        "SELECT m.id, mp.player_id FROM matches m "
+        "JOIN tournaments t ON t.id=m.tournament_id "
+        "JOIN competitions c ON c.id=t.competition_id "
+        "LEFT JOIN match_players mp ON mp.match_id=m.id "
+        "WHERE m.coverage_status='verified' AND m.outcome IN ('1','2','D') "
+        "AND m.played_on<=? " + competition_clause +
+        "ORDER BY m.played_on DESC, m.id DESC",
+        match_parameters,
+    ).fetchall()
+    match_ids: list[int] = []
+    participants: dict[int, set[int]] = {}
+    for match in recent_match_rows:
+        match_id = int(match["id"])
+        if match_id not in participants:
+            match_ids.append(match_id)
+            participants[match_id] = set()
+        if match["player_id"] is not None:
+            participants[match_id].add(int(match["player_id"]))
 
     for row in ranges:
         player_id = row["player_id"]
         minimum = float(row["min_rating"])
         maximum = float(row["max_rating"])
         midpoint = (minimum + maximum) / 2
-        competition_clause = "AND c.slug=? " if competition else ""
         parameters = [player_id, cutoff.isoformat(), reference.isoformat()]
         if competition:
             parameters.append(competition)
@@ -61,6 +85,15 @@ def player_ratings(
             score = max(0.0, min(1.0, NEUTRAL_SCORE + (raw_score - NEUTRAL_SCORE) * FORM_CONTRAST))
             rating = minimum + (maximum - minimum) * score
             active = True
+        missed_matches = 0
+        for match_id in match_ids:
+            if player_id in participants[match_id]:
+                break
+            missed_matches += 1
+        absence_penalty = missed_matches >= ABSENCE_THRESHOLD
+        if absence_penalty:
+            score = max(0.0, score - ABSENCE_PENALTY)
+            rating = minimum + (maximum - minimum) * score
         ratings[player_id] = {
             "min": minimum,
             "max": maximum,
@@ -70,5 +103,8 @@ def player_ratings(
             "formScore": round(score, 3),
             "dynamic": active,
             "windowDays": RATING_WINDOW_DAYS,
+            "missedMatches": missed_matches,
+            "absencePenalty": absence_penalty,
+            "absencePenaltyPercent": int(ABSENCE_PENALTY * 100) if absence_penalty else 0,
         }
     return ratings

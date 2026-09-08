@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronRight, Plus, Trophy } from 'lucide-react';
 import { API } from '@/components/site-client';
 import type { CompetitionStats, Game } from '@/lib/stats-context';
+import { estimatedTournamentEnd } from '@/lib/tournament-dates';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,12 @@ import {
 } from '@/components/ui/dialog';
 
 type Tournament = CompetitionStats['tournamentEditions'][number];
+
+const TOURNAMENT_RULE_OPTIONS = [
+  { value: 'goal_margin_both', label: '+1/−1 por cada 3 goles de diferencia' },
+  { value: 'goal_margin_loss', label: '−1 por derrota de 3 goles o más' },
+  { value: 'none', label: 'Sin regla especial' },
+] as const;
 
 function dateLabel(value: string | null) {
   if (!value) return 'Sin fecha';
@@ -34,12 +41,22 @@ export function TournamentsSection({
   const [name, setName] = useState('');
   const [startsOn, setStartsOn] = useState('');
   const [matchdayCount, setMatchdayCount] = useState('10');
+  const [ruleCode, setRuleCode] = useState('goal_margin_both');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Tournament | null>(null);
+  const estimatedEnd = useMemo(
+    () => estimatedTournamentEnd(startsOn, Number(matchdayCount)),
+    [startsOn, matchdayCount],
+  );
+  const returnPlayer = typeof window === 'undefined'
+    ? null
+    : new URLSearchParams(window.location.search).get('returnPlayer');
   const today = new Date().toISOString().slice(0, 10);
   const currentId = useMemo(
-    () => tournaments.find((item) => !item.endsOn || item.endsOn >= today)?.id,
+    () => tournaments.find((item) =>
+      Boolean(item.startsOn && item.startsOn <= today && item.endsOn && item.endsOn >= today),
+    )?.id,
     [tournaments, today],
   );
   const newestFirst = useMemo(
@@ -48,6 +65,11 @@ export function TournamentsSection({
     ),
     [tournaments],
   );
+  useEffect(() => {
+    const requestedId = Number(new URLSearchParams(window.location.search).get('tournament'));
+    if (!requestedId) return;
+    setSelected(tournaments.find((item) => item.id === requestedId) ?? null);
+  }, [tournaments]);
   const nextTournamentName = useMemo(() => {
     const lastNumber = tournaments.reduce((maximum, item) => {
       const match = item.displayName.match(/^T(?:orneo\s*)?(\d+)/i);
@@ -64,7 +86,7 @@ export function TournamentsSection({
       const response = await fetch(`${API}/tournaments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ competition, displayName: name, startsOn, matchdayCount: Number(matchdayCount) }),
+        body: JSON.stringify({ competition, displayName: name, startsOn, matchdayCount: Number(matchdayCount), ruleCode }),
       });
       const body = await response.json() as { error?: string };
       if (!response.ok) throw new Error(body.error || 'No se pudo crear el torneo');
@@ -72,6 +94,7 @@ export function TournamentsSection({
       setName('');
       setStartsOn('');
       setMatchdayCount('10');
+      setRuleCode('goal_margin_both');
       setCreating(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo crear el torneo');
@@ -96,6 +119,25 @@ export function TournamentsSection({
           </label>
           <label className="text-sm font-bold">Cantidad de fechas
             <input required type="number" min="1" max="100" value={matchdayCount} onChange={(e) => setMatchdayCount(e.target.value)} className="mt-1 h-11 w-full rounded-md border bg-white px-3 font-normal" />
+            <small className="mt-2 block font-normal text-muted-foreground" aria-live="polite">
+              {estimatedEnd
+                ? `Finalización estimada: ${dateLabel(estimatedEnd)}.`
+                : 'Elegí una fecha de inicio y la cantidad de fechas para estimar la finalización.'}
+              {' '}Se asume una fecha por semana, los {competition === 'sarria' ? 'miércoles' : 'sábados'}.
+            </small>
+          </label>
+          <label className="sm:col-span-2 text-sm font-bold">Regla del torneo
+            <select value={ruleCode} onChange={(e) => setRuleCode(e.target.value)} className="mt-1 h-11 w-full rounded-md border bg-white px-3 font-normal">
+              {TOURNAMENT_RULE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <small className="mt-2 block font-normal text-muted-foreground">
+              {ruleCode === 'goal_margin_both'
+                ? 'Por cada 3 goles de diferencia se suma 1 punto al ganador y se resta 1 al perdedor.'
+                : ruleCode === 'goal_margin_loss'
+                  ? 'Se descuenta 1 punto a cada jugador del equipo que pierda por una diferencia de 3 goles o más.'
+                  : 'El torneo usará solamente 3 puntos por victoria y 1 por empate.'}
+              {' '}La elección queda bloqueada al crear el torneo.
+            </small>
           </label>
         </div>
         {message && <p role="alert" className="mt-4 text-sm font-bold text-[#c33f2a]">{message}</p>}
@@ -115,7 +157,8 @@ export function TournamentsSection({
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {newestFirst.map((item) => {
-          const status = item.id === currentId ? 'Actual' : item.startsOn && item.startsOn > today ? 'Próximo' : 'Histórico';
+          const closed = Boolean(item.endsOn && item.endsOn < today);
+          const status = item.id === currentId ? 'En curso' : item.startsOn && item.startsOn > today ? 'Próximo' : 'Cerrado';
           return (
             <button
               type="button"
@@ -126,17 +169,32 @@ export function TournamentsSection({
             >
               <div className="flex items-start justify-between gap-3">
                 <div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#347a52]">{status}</p><h2 className="mt-1 font-display text-2xl">{item.displayName}</h2></div>
-                <Trophy className="size-6 text-[#d19a20]" />
+                {closed && <Trophy className="size-6 text-[#d19a20]" />}
               </div>
               <p className="mt-4 flex items-center gap-2 text-sm"><CalendarDays className="size-4" />{dateLabel(item.startsOn)} — {dateLabel(item.endsOn)}</p>
               <p className="mt-2 text-sm"><strong>{item.matchdayCount}</strong> fechas · <strong>{item.matchCount}</strong> partidos registrados</p>
-              <p className="mt-3 border-t pt-3 text-sm"><strong>Campeón:</strong> {item.champions.length ? item.champions.join(', ') : 'Sin campeón registrado'}</p>
+              {closed
+                ? <p className="mt-3 border-t pt-3 text-sm"><strong>Campeón:</strong> {item.champions.length ? item.champions.join(', ') : 'Sin campeón registrado'}</p>
+                : <p className="mt-3 border-t pt-3 text-sm font-bold text-[#347a52]">{item.startsOn && item.startsOn > today ? 'Todavía no comenzó' : 'Torneo en curso'}</p>}
+              <p className="mt-2 text-xs text-muted-foreground">{item.rules.length ? item.rules.map((rule) => rule.description).join(' · ') : 'Sin reglas especiales'}</p>
               <span className="mt-4 flex items-center justify-end gap-1 text-xs font-bold uppercase tracking-[.12em] text-[#347a52]">Ver partidos <ChevronRight className="size-4" /></span>
             </button>
           );
         })}
       </div>
-      <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
+      <Dialog
+        open={Boolean(selected)}
+        onOpenChange={(open) => {
+          if (open) return;
+          if (returnPlayer) {
+            window.location.assign(
+              `/?competition=${encodeURIComponent(competition)}&view=players&player=${encodeURIComponent(returnPlayer)}`,
+            );
+            return;
+          }
+          setSelected(null);
+        }}
+      >
         <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
           {selected && (
             <>

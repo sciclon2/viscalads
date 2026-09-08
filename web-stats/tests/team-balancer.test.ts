@@ -101,6 +101,19 @@ test('distingue una dupla positiva de una dupla con malos antecedentes', () => {
   assert.ok(negative.adjustment < 0);
 });
 
+test('cada dupla explicada pertenece realmente al equipo indicado', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  const history: BalanceGame[] = Array.from({ length: 5 }, () => ({
+    status: 'verified', outcome: '1',
+    team1: ['P1', 'P2', 'P3', 'P4'], team2: ['P5', 'P6', 'P7', 'P8'],
+  }));
+  const result = splitBalancedTeams(players, history);
+  const namesA = new Set(result.a.map((item) => item.name));
+  const namesB = new Set(result.b.map((item) => item.name));
+  assert.ok(result.notablePairsA.every((pair) => pair.names.every((name) => namesA.has(name))));
+  assert.ok(result.notablePairsB.every((pair) => pair.names.every((name) => namesB.has(name))));
+});
+
 test('rechaza convocatorias impares o menores de ocho', () => {
   assert.throws(() =>
     splitBalancedTeams(

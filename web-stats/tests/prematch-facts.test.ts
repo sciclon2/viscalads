@@ -64,3 +64,22 @@ test('no repite invicto y racha cuando un récord ganador ya cuenta la historia'
   const facts = prematchFacts(games, ['Ana'], ['Bea'], [], overlapRules);
   assert.deepEqual(facts.filter((fact) => fact.text.startsWith('Ana ')).map((fact) => fact.code), ['streak_record']);
 });
+
+test('los datos del torneo respetan la edición seleccionada y los equipos propuestos', () => {
+  const tournamentRules: FactRule[] = [
+    { code: 'leader_clash', title: 'Duelo', description: '', priority: 1 },
+  ];
+  const tournamentGame = (date: string, tournament: string, outcome: Game['outcome']) => ({
+    ...game(date, outcome), tournament,
+  });
+  const games = [
+    tournamentGame('2026-01-01', 'T1', '1'),
+    tournamentGame('2026-01-08', 'T1', '1'),
+    tournamentGame('2026-01-15', 'T1', '1'),
+    tournamentGame('2026-02-01', 'T2', '2'),
+  ];
+  const facts = prematchFacts(games, ['Ana'], ['Bea'], [], tournamentRules, games, 'T1');
+  assert.equal(facts.length, 1);
+  assert.match(facts[0].text, /T1/);
+  assert.equal(prematchFacts(games, ['Ana', 'Bea'], [], [], tournamentRules, games, 'T1').length, 0);
+});

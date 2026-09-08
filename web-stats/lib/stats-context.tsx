@@ -11,6 +11,9 @@ export type PlayerRating = {
   formScore: number;
   dynamic: boolean;
   windowDays: number;
+  missedMatches: number;
+  absencePenalty: boolean;
+  absencePenaltyPercent: number;
 };
 export type Profile = {
   id: number;
@@ -30,6 +33,7 @@ export type Profile = {
   preferredFoot: string;
   bio: string;
   rating: PlayerRating | null;
+  consecutiveAppearances?: number;
 };
 export type StatRow = {
   name: string | string[];
@@ -99,9 +103,31 @@ export type CompetitionStats = {
     matchdayCount: number;
     matchCount: number;
     champions: string[];
+    rules: {
+      code: string;
+      threshold: number;
+      pointsDelta: number;
+      description: string;
+    }[];
+    standings: {
+      playerId: number;
+      name: string;
+      played: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goals: number;
+      bonusMatches: number;
+      positivePoints: number;
+      penalizedMatches: number;
+      negativePoints: number;
+      basePoints: number;
+      totalPoints: number;
+    }[];
   }[];
   venues: Venue[];
   ratings: Record<string, PlayerRating>;
+  appearanceStreaks: Record<string, number>;
 };
 export type StatsData = {
   competitions: { slug: string; display_name: string; match_count: number }[];

@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
+import { ClipboardPaste, Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlayerAvatar } from '@/components/player-avatar';
+import { PrimeMomentBadge, RockBottomBadge } from '@/components/prime-moment-badge';
 import { PitchMarkings } from '@/components/pitch-markings';
-import type { Game, PlayerStat, Profile } from '@/lib/stats-context';
+import type { CompetitionStats, Game, PlayerStat, Profile } from '@/lib/stats-context';
 import { API } from '@/components/site-client';
 import { playerPositions } from '@/lib/player-options';
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/lib/team-formation';
 import { splitBalancedTeams, type BalancedTeams } from '@/lib/team-balancer';
 import { currentTournamentLeaders, prematchFacts, type FactRule, type PrematchFact } from '@/lib/prematch-facts';
+import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
 
 type Player = Pick<
   Profile,
@@ -27,6 +29,24 @@ type Player = Pick<
   guest?: boolean;
 };
 type TeamPair = BalancedTeams<Player>;
+type ParsedLine = {
+  raw: string;
+  value: string;
+  status: 'matched' | 'ambiguous' | 'unknown' | 'duplicate' | 'reserve' | 'excluded' | 'unconfirmed' | 'rotated_in' | 'rotated_out';
+  playerId: number | null;
+  player: string | null;
+  candidates: Array<{ playerId: number; player: string; score: number }>;
+  accepted: boolean;
+  confirmed: boolean;
+  slot: number | null;
+  guestCount: number;
+  consecutiveAppearances?: number;
+  replacesPlayer?: string;
+  replacedByPlayer?: string;
+  tieBreakRandom?: boolean;
+  rotationReason?: string;
+};
+type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; rotationChanges: number; complete: boolean };
 
 export function TeamBuilder({
   games,
@@ -35,6 +55,7 @@ export function TeamBuilder({
   profiles,
   stats,
   funnyFactRules,
+  tournaments,
 }: {
   games: Game[];
   globalGames: Game[];
@@ -42,6 +63,7 @@ export function TeamBuilder({
   profiles: Profile[];
   stats: PlayerStat[];
   funnyFactRules: FactRule[];
+  tournaments: CompetitionStats['tournamentEditions'];
 }) {
   const validGames = useMemo(
     () =>
@@ -53,7 +75,7 @@ export function TeamBuilder({
   const profilePlayers = useMemo<Player[]>(
     () =>
       profiles
-        .filter((p) => p.primary && p.competitions.includes(competition))
+        .filter((p) => p.competitions.includes(competition))
         .map((profile) => {
           const history = validGames.filter(
             (game) =>
@@ -67,10 +89,27 @@ export function TeamBuilder({
             lastDate: history.at(-1)?.date ?? '—',
           };
         })
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) =>
+          Number(hasRecentActivity(b.name, validGames, activityCutoff())) -
+            Number(hasRecentActivity(a.name, validGames, activityCutoff())) ||
+          a.name.localeCompare(b.name),
+        ),
     [validGames, profiles, competition],
   );
-  const tournamentState = useMemo(() => currentTournamentLeaders(validGames), [validGames]);
+  const currentTournament = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const ordered = [...tournaments].sort((a, b) =>
+      (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id,
+    );
+    return ordered.find((item) =>
+      (item.startsOn ?? '') <= today && (!item.endsOn || item.endsOn >= today),
+    ) ?? ordered[0];
+  }, [tournaments]);
+  const [selectedTournament, setSelectedTournament] = useState(currentTournament?.displayName ?? '');
+  const tournamentState = useMemo(
+    () => currentTournamentLeaders(validGames.filter((game) => game.tournament === selectedTournament)),
+    [validGames, selectedTournament],
+  );
   const [guests, setGuests] = useState<Player[]>([]),
     [guestLevel, setGuestLevel] = useState('5'),
     [guestPosition, setGuestPosition] = useState(''),
@@ -78,7 +117,15 @@ export function TeamBuilder({
     [search, setSearch] = useState(''),
     [teams, setTeams] = useState<TeamPair | null>(null),
     [facts, setFacts] = useState<PrematchFact[] | null>(null),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [pasteOpen, setPasteOpen] = useState(false),
+    [pastedList, setPastedList] = useState(''),
+    [parsedList, setParsedList] = useState<ParsedList | null>(null),
+    [capacityAnswer, setCapacityAnswer] = useState(''),
+    [resolutions, setResolutions] = useState<Record<number, string>>({}),
+    [parsing, setParsing] = useState(false),
+    [savingLineup, setSavingLineup] = useState(false),
+    [lineupSaved, setLineupSaved] = useState(false);
   const players = useMemo(
     () => [...profilePlayers, ...guests],
     [profilePlayers, guests],
@@ -99,6 +146,7 @@ export function TeamBuilder({
     );
     setTeams(null);
     setFacts(null);
+    setLineupSaved(false);
     setMessage('');
   };
   const addGuest = () => {
@@ -128,7 +176,43 @@ export function TeamBuilder({
     setTeams(null);
     setFacts(null);
   };
-  const create = () => {
+  const parseList = async (declaredCapacity?: number) => {
+    setParsing(true);
+    setMessage('');
+    try {
+      const response = await fetch(`${API}/lineups/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          competition,
+          text: declaredCapacity ? `Cupo ${declaredCapacity} jugadores\n${pastedList}` : pastedList,
+        }),
+      });
+      const body = await response.json() as Partial<ParsedList> & { error?: string };
+      if (!response.ok) throw new Error(body.error || 'No se pudo interpretar la lista');
+      setParsedList({ items: body.items ?? [], capacity: body.capacity ?? null, acceptedCount: body.acceptedCount ?? 0, waitingCount: body.waitingCount ?? 0, rotationChanges: body.rotationChanges ?? 0, complete: body.complete ?? false });
+      if (body.capacity) setCapacityAnswer('');
+      setResolutions({});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo interpretar la lista');
+    } finally {
+      setParsing(false);
+    }
+  };
+  const useParsedList = () => {
+    const names = parsedList?.items.flatMap((line, index) => {
+      if (!line.accepted) return [];
+      if ((line.status === 'matched' || line.status === 'rotated_in') && line.player) return [line.player];
+      const choice = resolutions[index];
+      return choice ? [choice] : [];
+    }) ?? [];
+    setSelected([...new Set(names)]);
+    setTeams(null);
+    setFacts(null);
+    setMessage('');
+    setPasteOpen(false);
+  };
+  const create = async () => {
     if (selected.length < 8) {
       setMessage('Seleccioná al menos 8 jugadores.');
       return;
@@ -144,21 +228,33 @@ export function TeamBuilder({
     setTeams(result);
     setFacts(null);
     setMessage('');
-    void fetch(`${API}/lineups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        competition,
-        teams: [
-          result.a.map((item) => item.guest
-            ? { guestName: item.name, level: item.level, position: item.primary }
-            : { playerId: item.id }),
-          result.b.map((item) => item.guest
-            ? { guestName: item.name, level: item.level, position: item.primary }
-            : { playerId: item.id }),
-        ],
-      }),
-    });
+    setLineupSaved(false);
+    setSavingLineup(true);
+    try {
+      const response = await fetch(`${API}/lineups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          competition,
+          teams: [
+            result.a.map((item) => item.guest
+              ? { guestName: item.name, level: item.level, position: item.primary }
+              : { playerId: item.id }),
+            result.b.map((item) => item.guest
+              ? { guestName: item.name, level: item.level, position: item.primary }
+              : { playerId: item.id }),
+          ],
+        }),
+      });
+      const body = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(body.error || 'No se pudo guardar la formación');
+      setLineupSaved(true);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo guardar la formación');
+    } finally {
+      setSavingLineup(false);
+    }
   };
   const average = (team: Player[]) =>
     team.reduce((n, p) => n + p.level, 0) / team.length;
@@ -172,6 +268,80 @@ export function TeamBuilder({
           </div>
           <strong>{selected.length} seleccionados</strong>
         </div>
+        <button
+          type="button"
+          onClick={() => { setPasteOpen((open) => !open); setParsedList(null); setCapacityAnswer(''); setMessage(''); }}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[#173d2a]/20 bg-[#edf3e8] px-3 py-2 text-sm font-bold text-[#173d2a]"
+        >
+          <ClipboardPaste className="size-4" /> Pegar lista de WhatsApp
+        </button>
+        {pasteOpen && (
+          <div className="mb-4 rounded-xl border border-[#173d2a]/15 bg-white p-3 shadow-sm">
+            <label className="text-sm font-bold text-[#173d2a]">Lista de convocados
+              <textarea value={pastedList} onChange={(event) => { setPastedList(event.target.value); setParsedList(null); }} placeholder={'6 a side\n1. Facu IN\n2. Mati IN\n…\nSuplentes\n13. Sergio IN'} className="mt-2 min-h-36 w-full rounded-lg border p-3 font-mono text-sm font-normal" />
+            </label>
+            <button type="button" disabled={parsing || !pastedList.trim()} onClick={() => void parseList()} className="mt-2 rounded-lg bg-[#173d2a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{parsing ? 'Analizando…' : 'Revisar lista'}</button>
+            {parsedList && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#347a52]">Esto entendimos</p>
+                <div className="rounded-lg bg-[#edf3e8] p-3 text-sm">
+                  <strong>{parsedList.capacity ? `${parsedList.acceptedCount}/${parsedList.capacity} lugares confirmados` : `${parsedList.acceptedCount} confirmados · cupo no detectado`}</strong>
+                  <span className="ml-2 text-muted-foreground">{parsedList.waitingCount ? `· ${parsedList.waitingCount} esperando como suplente` : ''}</span>
+                  {parsedList.capacity && !parsedList.complete && <small className="mt-1 block text-[#a05722]">La convocatoria todavía no completa el cupo detectado.</small>}
+                  {parsedList.rotationChanges > 0 && <small className="mt-1 block font-bold text-[#347a52]">Se aplicaron {parsedList.rotationChanges} cambio{parsedList.rotationChanges === 1 ? '' : 's'} por rotación.</small>}
+                </div>
+                {parsedList.capacity === null && (
+                  <div className="rounded-lg border border-[#c47a16]/30 bg-[#fff7e8] p-3">
+                    <label className="text-sm font-bold text-[#805014]">
+                      No pudimos detectar el cupo. ¿Cuántos van a jugar?
+                      <input
+                        type="number"
+                        min="2"
+                        max="40"
+                        inputMode="numeric"
+                        value={capacityAnswer}
+                        onChange={(event) => setCapacityAnswer(event.target.value)}
+                        className="mt-2 h-10 w-full rounded-md border bg-white px-3 text-[#173d2a]"
+                        placeholder="Ejemplo: 12"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!Number.isInteger(Number(capacityAnswer)) || Number(capacityAnswer) < 2 || Number(capacityAnswer) > 40 || parsing}
+                      onClick={() => void parseList(Number(capacityAnswer))}
+                      className="mt-2 rounded-lg bg-[#173d2a] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      Confirmar cupo y revisar
+                    </button>
+                  </div>
+                )}
+                {parsedList.items.map((line, index) => ({ line, index })).filter(({ line }) => line.confirmed).map(({ line, index }) => (
+                  <div key={`${line.raw}-${index}`} className="grid gap-2 rounded-lg border p-2 text-sm sm:grid-cols-[1fr_1fr] sm:items-center">
+                    <span><strong>{line.value}</strong><small className="block text-muted-foreground">{line.raw}</small></span>
+                    {line.status === 'matched' ? <span className="font-bold text-[#347a52]">✓ {line.player} · {line.consecutiveAppearances ?? 0} PJ seguidos</span>
+                      : line.status === 'rotated_in' ? <span className="font-bold text-[#347a52]">↥ Entra {line.player} ({line.consecutiveAppearances ?? 0} PJ) por {line.replacesPlayer}</span>
+                        : line.status === 'rotated_out' ? <span className="font-bold text-[#b64936]">↧ Cede su lugar a {line.replacedByPlayer} · {line.consecutiveAppearances ?? 0} PJ seguidos</span>
+                      : line.status === 'duplicate' ? <span className="font-bold text-[#c47a16]">Repetido: {line.player}</span>
+                        : line.status === 'reserve' ? <span className="font-bold text-[#7c6a43]">Suplente: espera fuera del cupo{line.player ? ` · ${line.player}` : ''}</span>
+                          : line.status === 'unconfirmed' ? <span className="font-bold text-muted-foreground">Sin IN: no quiere o no puede jugar; se descarta</span>
+                          : line.status === 'excluded' ? <span className="font-bold text-[#b64936]">Marcado fuera: no se incluye</span>
+                        : <select aria-label={`Resolver ${line.value}`} value={resolutions[index] ?? ''} onChange={(event) => setResolutions((current) => ({ ...current, [index]: event.target.value }))} className="h-10 rounded-md border bg-white px-2">
+                            <option value="">{line.status === 'unknown' ? 'No incluir / elegir jugador…' : '¿Quién es?'}</option>
+                            {(line.candidates.length ? line.candidates.map((candidate) => candidate.player) : profilePlayers.map((player) => player.name)).map((name) => <option key={name} value={name}>{name}</option>)}
+                          </select>}
+                  </div>
+                ))}
+                {parsedList.items.some((line) => line.guestCount > 0 && line.accepted) && <p className="rounded-lg border border-[#c47a16]/30 bg-[#fff7e8] p-2 text-xs text-[#805014]">La lista contiene “+1”. Esos lugares cuentan para el cupo, pero tendrás que agregar los invitados con nivel y posición antes de crear los equipos.</p>}
+                {parsedList.items.filter((line) => line.status === 'rotated_in').map((line) => (
+                  <p key={`rotation-${line.playerId}`} className="rounded-lg border border-[#347a52]/25 bg-[#edf3e8] p-2 text-xs text-[#173d2a]">
+                    <strong>Por qué se hizo el cambio:</strong> {line.rotationReason}
+                  </p>
+                ))}
+                <button type="button" disabled={parsedList.capacity === null} onClick={useParsedList} className="mt-2 w-full rounded-lg bg-[#e34f32] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Usar convocatoria propuesta</button>
+              </div>
+            )}
+          </div>
+        )}
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -192,7 +362,7 @@ export function TeamBuilder({
             >
               <PlayerAvatar name={player.name} className="size-10" />
               <span>
-                <strong>{player.name}</strong>
+                <strong>{player.name} <PrimeMomentBadge rating={player.rating} compact /><RockBottomBadge rating={player.rating} compact /></strong>
                 <small>
                   {player.primary || 'Flexible / sin posición'}
                   {player.alternate ? ` · alt. ${player.alternate}` : ''}
@@ -272,16 +442,31 @@ export function TeamBuilder({
           }}
           onRemove={toggle}
         />
+        <label className="mb-3 block rounded-xl border border-[#173d2a]/15 bg-white p-3 text-sm font-bold text-[#173d2a]">
+          Torneo del partido que se va a jugar
+          <select
+            value={selectedTournament}
+            onChange={(event) => { setSelectedTournament(event.target.value); setTeams(null); setFacts(null); setLineupSaved(false); }}
+            className="mt-2 h-10 w-full rounded-md border bg-white px-3 font-normal"
+          >
+            {tournaments.map((item) => (
+              <option key={item.id} value={item.displayName}>
+                {item.displayName}{item.id === currentTournament?.id ? ' · Actual' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="builder-actions">
           <p>
             {selected.length > 0
               ? `${selected.length / 2} vs ${selected.length / 2}`
               : 'Seleccioná una cantidad par'}
           </p>
-          <Button size="lg" onClick={create} disabled={selected.length < 8}>
-            Crear equipos
+          <Button size="lg" onClick={() => void create()} disabled={selected.length < 8 || savingLineup}>
+            {savingLineup ? 'Guardando…' : 'Crear equipos'}
           </Button>
         </div>
+        {lineupSaved && <p className="rounded-lg bg-[#edf3e8] px-3 py-2 text-sm font-bold text-[#347a52]">✓ Formación guardada. Ya está disponible en “Guardar partido jugado”.</p>}
         {message && <p className="builder-error">{message}</p>}
         {teams && (
           <div className="team-results">
@@ -305,7 +490,7 @@ export function TeamBuilder({
             </div>
             <BalanceExplanation
               teams={teams}
-              tournament={tournamentState.tournament}
+              tournament={selectedTournament}
               leaders={tournamentState.matchDays >= 3 ? tournamentState.leaders.slice(0, 4).map(([name]) => name) : []}
             />
             <div className="prematch-facts-action">
@@ -318,6 +503,7 @@ export function TeamBuilder({
                   stats,
                   funnyFactRules,
                   globalGames,
+                  selectedTournament,
                 ))}
               >
                 <Flame /> Datos para la previa
@@ -390,7 +576,7 @@ function TeamPitch({
             name={player.name}
             className="mb-1 size-9 border-2 border-white"
           />
-          <span>{player.name}</span>
+          <span>{player.name} <PrimeMomentBadge rating={player.rating} compact /><RockBottomBadge rating={player.rating} compact /></span>
           <small>{playerRole}</small>
         </div>
       );
@@ -448,7 +634,7 @@ function TeamPitch({
                 className="selected-player-avatar size-10"
               />
               <span className="selected-player-copy">
-                <strong>{player.name}</strong>
+                <strong>{player.name} <PrimeMomentBadge rating={player.rating} compact /><RockBottomBadge rating={player.rating} compact /></strong>
                 <small>
                   {player.primary ? role(player.primary) : 'Flexible'} · nivel{' '}
                   {player.level.toFixed(2)}
@@ -479,37 +665,27 @@ function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; t
     quietB = teams.b.filter(
       (player) => (player.rating?.formScore ?? 0.5) <= 0.3,
     );
+  const notablePairsA = teams.notablePairsA.filter((pair) => pair.names.every((name) => teams.a.some((player) => player.name === name))),
+    notablePairsB = teams.notablePairsB.filter((pair) => pair.names.every((name) => teams.b.some((player) => player.name === name)));
   const chemistryNotes = [
-    teams.notablePairsA[0]
-      ? pairExplanation(teams.notablePairsA[0], 'Celeste')
+    notablePairsA[0]
+      ? pairExplanation(notablePairsA[0], 'Celeste')
       : '',
-    teams.notablePairsB[0]
-      ? pairExplanation(teams.notablePairsB[0], 'Rosa')
+    notablePairsB[0]
+      ? pairExplanation(notablePairsB[0], 'Rosa')
       : '',
   ].filter(Boolean);
   const rule =
     teams.a.length === 6
       ? `Cada equipo tiene exactamente 2 defensores y entre 1 y 2 delanteros.${teams.keeperA || teams.keeperB ? ' Los porteros se muestran bajo el arco y no se cuentan como defensores.' : ''}`
       : teams.a.length === 8
-        ? `Cada equipo tiene 3 defensores, al menos 3 medios y entre 1 y 2 delanteros.${teams.keeperA || teams.keeperB ? ' El portero aparece separado, bajo el arco.' : ' Como no hay portero natural, el arco seguirá rotando.'}`
+        ? `Cada equipo tiene 3 defensores, al menos 3 medios y entre 1 y 2 delanteros.${teams.keeperA || teams.keeperB ? ' El portero aparece separado, bajo el arco.' : ''}`
         : teams.a.length === 5
           ? 'Cada equipo tiene como máximo 2 defensores y entre 1 y 2 delanteros.'
           : 'Las líneas se distribuyeron proporcionalmente.';
   return (
     <div className="balance-explanation">
-      <div>
-        <strong>
-          {teams.difference <= 0.1
-            ? 'Dos equipos muy parejos'
-            : teams.difference <= 0.25
-              ? 'Un equilibrio sólido'
-              : 'La convocatoria permite un equilibrio limitado'}
-        </strong>
-        <span>
-          Se repartió el nivel actual para que ninguno de los dos lados
-          concentre claramente a los jugadores más fuertes de esta convocatoria.
-        </span>
-      </div>
+      <div><strong>Partido del torneo</strong><span>Esta propuesta corresponde a <b>{tournament || 'la edición actual'}</b>. La pelea por la tabla y los líderes se evalúan dentro de esa edición.</span></div>
       <div>
         <strong>
           {valid ? 'Formaciones válidas' : 'Convocatoria limitada'}
@@ -523,16 +699,14 @@ function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; t
             : 'No hay suficientes posiciones compatibles para cumplir todos los límites.'}
         </span>
       </div>
-      <div>
+      {(teams.keeperA || teams.keeperB) && <div>
         <strong>Portería</strong>
         <span>
           {teams.keeperA && teams.keeperB
             ? `${teams.keeperA.name} y ${teams.keeperB.name} quedaron separados, uno por equipo; por eso la portería no da ventaja adicional a ningún lado.`
-            : teams.keeperA || teams.keeperB
-              ? `${(teams.keeperA ?? teams.keeperB)!.name} es el único portero disponible. Su ventaja fue compensada repartiendo el nivel de campo.`
-              : 'No hay un portero natural en la convocatoria, así que este factor no inclinó el armado.'}
+            : `${(teams.keeperA ?? teams.keeperB)!.name} es el único portero disponible. Su ventaja fue compensada repartiendo el nivel de campo.`}
         </span>
-      </div>
+      </div>}
       <div>
         <strong>Momento de los jugadores</strong>
         <span>
@@ -547,7 +721,7 @@ function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; t
       <div>
         <strong>Química y flexibilidad</strong>
         <span>
-          {teams.notablePairsA.length || teams.notablePairsB.length
+          {notablePairsA.length || notablePairsB.length
             ? `${chemistryNotes.join(' ')} Las duplas positivas y negativas sólo se usan para afinar el equilibrio: no impiden que todos jueguen con todos y nunca pesan más que el nivel o la formación.`
             : 'No había duplas con suficiente historial como para alterar la propuesta.'}{' '}
           Se recurrió a{' '}
@@ -610,7 +784,7 @@ function Team({
               <div className="team-player" key={player.name}>
                 <PlayerAvatar name={player.name} className="size-9" />
                 <span>
-                  <strong>{player.name}</strong>
+                  <strong>{player.name} <PrimeMomentBadge rating={player.rating} compact /><RockBottomBadge rating={player.rating} compact /></strong>
                   <small>
                     {assigned} ·{' '}
                     {isFlexible

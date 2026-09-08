@@ -1,10 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Pencil, Plus, RotateCcw, Search, ShieldCheck, UserMinus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Pencil, Plus, RotateCcw, Search, ShieldCheck, Trophy, UserMinus } from 'lucide-react';
 import { API } from '@/components/site-client';
 import { PlayerAvatar } from '@/components/player-avatar';
-import type { Game, PlayerStat, Profile } from '@/lib/stats-context';
+import { PlayerComparison } from '@/components/player-comparison';
+import { PrimeMomentBadge, RockBottomBadge } from '@/components/prime-moment-badge';
+import type { CompetitionStats, Game, PlayerStat, Profile } from '@/lib/stats-context';
+import { ratingRangePosition } from '@/lib/player-rating';
+import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
 import {
   countries,
   countryFlag,
@@ -87,12 +91,14 @@ export function PlayersSection({
   profiles,
   stats,
   games,
+  tournaments,
   onSaved,
 }: {
   competition: string;
   profiles: Profile[];
   stats: PlayerStat[];
   games: Game[];
+  tournaments: CompetitionStats['tournamentEditions'];
   onSaved: () => Promise<void>;
 }) {
   const [search, setSearch] = useState(''),
@@ -102,6 +108,7 @@ export function PlayersSection({
     [draft, setDraft] = useState<Draft | null>(null),
     [message, setMessage] = useState(''),
     [saving, setSaving] = useState(false);
+  const recentCutoff = activityCutoff();
   const scoped = useMemo(
     () =>
       profiles
@@ -113,11 +120,12 @@ export function PlayersSection({
         )
         .sort(
           (a, b) =>
-            (b.rating?.formScore ?? 0.5) - (a.rating?.formScore ?? 0.5) ||
-            (b.rating?.current ?? 0) - (a.rating?.current ?? 0) ||
+            Number(hasRecentActivity(b.name, games, recentCutoff)) -
+              Number(hasRecentActivity(a.name, games, recentCutoff)) ||
+            ratingRangePosition(b.rating) - ratingRangePosition(a.rating) ||
             a.name.localeCompare(b.name),
         ),
-    [profiles, competition, search],
+    [profiles, competition, search, games, recentCutoff],
   );
   const inactive = useMemo(
     () => profiles
@@ -125,6 +133,22 @@ export function PlayersSection({
       .sort((a, b) => a.name.localeCompare(b.name)),
     [profiles, competition],
   );
+  useEffect(() => {
+    const requestedPlayer = new URLSearchParams(window.location.search).get('player');
+    if (!requestedPlayer) return;
+    const profile = profiles.find(
+      (item) => item.id === Number(requestedPlayer) && item.competitions.includes(competition),
+    );
+    if (profile) {
+      setSelected(profile);
+      setDraft(draftOf(profile));
+      setEditing(false);
+      setCreating(false);
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('player');
+      window.history.replaceState(null, '', cleanUrl);
+    }
+  }, [profiles, competition]);
   const row = selected
     ? stats.find((item) => item.name === selected.name)
     : undefined;
@@ -241,6 +265,7 @@ export function PlayersSection({
         </label>
         <div className="players-toolbar-actions">
           <span>{scoped.length} jugadores de {competition === 'sarria' ? 'Sarrià' : 'Bogatell'}</span>
+          <PlayerComparison profiles={scoped} stats={stats} games={games} tournaments={tournaments} />
           <button onClick={() => { setCreating(true); setSelected(null); setDraft(emptyDraft()); setEditing(true); setMessage(''); }}>
             <Plus /> Agregar jugador
           </button>
@@ -263,14 +288,8 @@ export function PlayersSection({
               <span>
                 <strong>
                   {player.name}{' '}
-                  {flag && (
-                    <span
-                      className="directory-flag"
-                      aria-label={player.nationality}
-                    >
-                      {flag}
-                    </span>
-                  )}
+                  <PrimeMomentBadge rating={player.rating} compact />
+                  <RockBottomBadge rating={player.rating} compact />
                 </strong>
                 {player.nickname && <em>“{player.nickname}”</em>}
                 <small>
@@ -278,10 +297,15 @@ export function PlayersSection({
                   {player.alternate ? ` · ${player.alternate}` : ''}
                 </small>
               </span>
-              <span className="directory-rating">
-                <b>{player.rating?.current.toFixed(2) ?? '—'}</b>
-                <small>{player.rating ? 'nivel actual' : 'sin rango'}</small>
-              </span>
+              {flag && (
+                <span
+                  className="directory-flag"
+                  aria-label={player.nationality}
+                  title={player.nationality}
+                >
+                  {flag}
+                </span>
+              )}
               {player.rating && <RatingRange rating={player.rating} compact />}
               <span className="directory-record">
                 {stat?.played ?? 0} PJ · {Math.round(efficiency(stat) * 100)}%
@@ -348,6 +372,8 @@ export function PlayersSection({
                     player={selected!}
                     stat={row}
                     recentGames={recentGames}
+                    competition={competition}
+                    tournaments={tournaments}
                   />
                 )}{' '}
                 {message && (
@@ -382,13 +408,20 @@ function PlayerDetails({
   player,
   stat,
   recentGames,
+  competition,
+  tournaments,
 }: {
   player: Profile;
   stat?: PlayerStat;
   recentGames: Game[];
+  competition: string;
+  tournaments: CompetitionStats['tournamentEditions'];
 }) {
   const r = player.rating,
-    flag = countryFlag(player.nationality);
+    flag = countryFlag(player.nationality),
+    titles = tournaments.filter((tournament) =>
+      tournament.champions.includes(player.name),
+    );
   return (
     <div className="player-detail-grid">
       <Info
@@ -410,6 +443,38 @@ function PlayerDetails({
         }
       />
       <Info
+        label="Partidos consecutivos"
+        value={`${player.consecutiveAppearances ?? 0}`}
+      />
+      <div className="player-biography">
+        <strong>Descripción</strong>
+        <p>{player.bio || 'Todavía no hay una descripción cargada.'}</p>
+      </div>
+      <div className="player-titles">
+        <strong>Torneos ganados</strong>
+        {titles.length ? (
+          <div>
+            {titles.map((tournament) => (
+              <button
+                type="button"
+                key={tournament.id}
+                onClick={() =>
+                  window.location.assign(
+                    `/?competition=${encodeURIComponent(competition)}&view=tournaments&tournament=${tournament.id}&returnPlayer=${player.id}`,
+                  )
+                }
+                title={`Ver detalles de ${tournament.displayName}`}
+              >
+                <Trophy />
+                <span>{tournament.displayName}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p>Sin torneos ganados en esta competición.</p>
+        )}
+      </div>
+      <Info
         label="Rango de nivel"
         value={r ? `${r.min.toFixed(1)}–${r.max.toFixed(1)}` : 'Pendiente'}
       />
@@ -417,6 +482,8 @@ function PlayerDetails({
         label="Nivel actual"
         value={r ? r.current.toFixed(2) : 'Sin calcular'}
       />
+      <PrimeMomentBadge rating={r} />
+      <RockBottomBadge rating={r} />
       {r && <RatingRange rating={r} />}
       <div className="player-rating-note">
         <ShieldCheck />
@@ -428,6 +495,15 @@ function PlayerDetails({
             : 'Definí un rango para activar el cálculo dinámico.'}
         </span>
       </div>
+      {r?.absencePenalty && (
+        <div className="player-absence-penalty">
+          <span>−{r.absencePenaltyPercent}%</span>
+          <p>
+            Lleva <strong>{r.missedMatches} ausencias consecutivas</strong>. La
+            penalización se activa desde la tercera ausencia.
+          </p>
+        </div>
+      )}
       {r && <RecentRatingMatches player={player.name} games={recentGames} />}
       <div className="player-stat-strip">
         <b>
@@ -466,11 +542,14 @@ function RecentRatingMatches({
   games: Game[];
 }) {
   return (
-    <div className="player-recent-rating">
-      <div className="player-recent-heading">
-        <strong>Partidos usados para el nivel</strong>
-        <span>{games.length}/10 · últimos 90 días</span>
-      </div>
+    <details className="player-recent-rating">
+      <summary className="player-recent-heading">
+        <span>
+          <strong>Partidos usados para el nivel</strong>
+          <small>{games.length}/10 · últimos 90 días</small>
+        </span>
+        <ChevronDown aria-hidden="true" />
+      </summary>
       {games.length ? (
         <div className="player-recent-list">
           {games.map((game) => {
@@ -508,7 +587,7 @@ function RecentRatingMatches({
       ) : (
         <p>No hay partidos válidos dentro de la ventana actual.</p>
       )}
-    </div>
+    </details>
   );
 }
 function RatingRange({
@@ -554,11 +633,13 @@ function RatingRange({
           {Math.round(position)}%
         </strong>
       </div>
-      <div className="rating-range-track">
-        <span className="rating-range-fill" style={{ width: `${position}%` }} />
+      <div className="rating-range-track" aria-label={`Escala gradual: ${Math.round(position)} por ciento`}>
         <span
           className="rating-range-marker"
-          style={{ left: `${position}%` }}
+          style={{
+            left: `${position}%`,
+            background: `hsl(${position * 1.2} 72% 40%)`,
+          }}
         />
       </div>
       <div className="rating-range-labels">

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from ..services.tournaments import calculated_tournament_champions
+
 
 def matches(connection: sqlite3.Connection) -> list[dict]:
     base = connection.execute(
@@ -75,15 +77,13 @@ def profiles(connection: sqlite3.Connection) -> list[dict]:
 
 
 def champions(connection: sqlite3.Connection) -> list[dict]:
-    rows = connection.execute(
-        "SELECT t.code, p.canonical_name FROM tournament_champions tc "
-        "JOIN tournaments t ON t.id=tc.tournament_id JOIN players p ON p.id=tc.player_id "
-        "ORDER BY t.id, p.canonical_name"
-    ).fetchall()
-    grouped: dict[str, list[str]] = {}
+    rows = connection.execute("SELECT id, code FROM tournaments ORDER BY id").fetchall()
+    result = []
     for row in rows:
-        grouped.setdefault(row["code"], []).append(row["canonical_name"])
-    return [{"tournament": tournament, "winner": " + ".join(winners)} for tournament, winners in grouped.items()]
+        winners = calculated_tournament_champions(connection, row["id"])
+        if winners:
+            result.append({"tournament": row["code"], "winner": " + ".join(winners)})
+    return result
 
 
 def competitions(connection: sqlite3.Connection) -> list[dict]:

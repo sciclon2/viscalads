@@ -7,6 +7,7 @@ from pathlib import Path
 from ..repositories.history import champions, competitions, matches, profiles, venues
 from .statistics import build_statistics
 from .ratings import player_ratings
+from .rotation import consecutive_appearances
 from .tournaments import list_tournaments
 
 
@@ -32,6 +33,7 @@ def web_payload(connection: sqlite3.Connection) -> dict:
         competition_stats[slug] = {
             **scoped_stats,
             "ratings": player_ratings(connection, competition=slug),
+            "appearanceStreaks": consecutive_appearances(connection, slug),
             "games": [game for game in public_games if game["competition"] == slug],
             "champions": [item for item in champions(connection) if any(
                 game["tournament"] == item["tournament"] for game in scoped_games
