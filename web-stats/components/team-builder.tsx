@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ClipboardPaste, Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import {
 import { splitBalancedTeams, type BalancedTeams } from '@/lib/team-balancer';
 import { currentTournamentLeaders, prematchFacts, type FactRule, type PrematchFact } from '@/lib/prematch-facts';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
+import { isTournamentClosedOn } from '@/lib/tournament-dates';
 
 type Player = Pick<
   Profile,
@@ -96,16 +97,25 @@ export function TeamBuilder({
         ),
     [validGames, profiles, competition],
   );
+  const today = new Date().toISOString().slice(0, 10);
+  const availableTournaments = useMemo(() => {
+    return [...tournaments]
+      .filter((item) => !isTournamentClosedOn(item.endsOn, today))
+      .sort((a, b) => (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id);
+  }, [tournaments, today]);
   const currentTournament = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const ordered = [...tournaments].sort((a, b) =>
-      (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id,
-    );
-    return ordered.find((item) =>
+    return availableTournaments.find((item) =>
       (item.startsOn ?? '') <= today && (!item.endsOn || item.endsOn >= today),
-    ) ?? ordered[0];
-  }, [tournaments]);
+    ) ?? availableTournaments[0];
+  }, [availableTournaments, today]);
   const [selectedTournament, setSelectedTournament] = useState(currentTournament?.displayName ?? '');
+  useEffect(() => {
+    setSelectedTournament((selected) =>
+      availableTournaments.some((item) => item.displayName === selected)
+        ? selected
+        : (currentTournament?.displayName ?? ''),
+    );
+  }, [availableTournaments, currentTournament]);
   const tournamentState = useMemo(
     () => currentTournamentLeaders(validGames.filter((game) => game.tournament === selectedTournament)),
     [validGames, selectedTournament],
@@ -214,6 +224,10 @@ export function TeamBuilder({
     setPasteOpen(false);
   };
   const create = async () => {
+    if (!availableTournaments.some((item) => item.displayName === selectedTournament)) {
+      setMessage('No hay un torneo abierto para armar equipos. Creá el próximo torneo primero.');
+      return;
+    }
     if (selected.length < 8) {
       setMessage('Seleccioná al menos 8 jugadores.');
       return;
@@ -449,8 +463,10 @@ export function TeamBuilder({
             value={selectedTournament}
             onChange={(event) => { setSelectedTournament(event.target.value); setTeams(null); setFacts(null); setLineupSaved(false); }}
             className="mt-2 h-10 w-full rounded-md border bg-white px-3 font-normal"
+            disabled={availableTournaments.length === 0}
           >
-            {tournaments.map((item) => (
+            {availableTournaments.length === 0 && <option value="">No hay torneos abiertos</option>}
+            {availableTournaments.map((item) => (
               <option key={item.id} value={item.displayName}>
                 {item.displayName}{item.id === currentTournament?.id ? ' · Actual' : ''}
               </option>
@@ -463,7 +479,7 @@ export function TeamBuilder({
               ? `${selected.length / 2} vs ${selected.length / 2}`
               : 'Seleccioná una cantidad par'}
           </p>
-          <Button size="lg" onClick={() => void create()} disabled={selected.length < 8 || savingLineup}>
+          <Button size="lg" onClick={() => void create()} disabled={selected.length < 8 || savingLineup || !selectedTournament}>
             {savingLineup ? 'Guardando…' : 'Crear equipos'}
           </Button>
         </div>
@@ -519,7 +535,7 @@ export function TeamBuilder({
                 </header>
                 {facts.length ? facts.map((fact) => (
                   <article key={fact.code}>
-                    <strong>{fact.title} <small>{fact.scope === 'global' ? 'Historial global' : competition}</small></strong>
+                    <strong>{fact.title}{fact.scope === 'global' && <> <small>Historial global</small></>}</strong>
                     <p>{fact.text}</p>
                   </article>
                 )) : (

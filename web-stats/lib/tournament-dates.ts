@@ -11,3 +11,7 @@ export function estimatedTournamentEnd(startsOn: string, matchdayCount: number):
   start.setUTCDate(start.getUTCDate() + (matchdayCount - 1) * 7);
   return start.toISOString().slice(0, 10);
 }
+
+export function isTournamentClosedOn(endsOn: string | null, date: string): boolean {
+  return Boolean(endsOn && endsOn < date);
+}
