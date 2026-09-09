@@ -34,6 +34,15 @@ export type Profile = {
   bio: string;
   rating: PlayerRating | null;
   consecutiveAppearances?: number;
+  achievements: {
+    code: string;
+    title: string;
+    description: string;
+    earnedFrom: string | null;
+    earnedAt: string | null;
+    level: string | null;
+    progress: number | null;
+  }[];
 };
 export type StatRow = {
   name: string | string[];
@@ -128,6 +137,7 @@ export type CompetitionStats = {
   venues: Venue[];
   ratings: Record<string, PlayerRating>;
   appearanceStreaks: Record<string, number>;
+  achievements: Record<string, Profile['achievements']>;
 };
 export type StatsData = {
   competitions: { slug: string; display_name: string; match_count: number }[];

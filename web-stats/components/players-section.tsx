@@ -6,6 +6,7 @@ import { API } from '@/components/site-client';
 import { PlayerAvatar } from '@/components/player-avatar';
 import { PlayerComparison } from '@/components/player-comparison';
 import { PrimeMomentBadge, RockBottomBadge } from '@/components/prime-moment-badge';
+import { AchievementPatches } from '@/components/achievement-patches';
 import type { CompetitionStats, Game, PlayerStat, Profile } from '@/lib/stats-context';
 import { ratingRangePosition } from '@/lib/player-rating';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
@@ -156,7 +157,7 @@ export function PlayersSection({
     if (!selected) return [];
     const cutoff = new Date();
     cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - 90);
+    cutoff.setDate(cutoff.getDate() - 95);
     const cutoffDate = cutoff.toISOString().slice(0, 10);
     const today = new Date().toISOString().slice(0, 10);
     return games
@@ -450,6 +451,7 @@ function PlayerDetails({
         <strong>Descripción</strong>
         <p>{player.bio || 'Todavía no hay una descripción cargada.'}</p>
       </div>
+      <AchievementPatches achievements={player.achievements ?? []} />
       <div className="player-titles">
         <strong>Torneos ganados</strong>
         {titles.length ? (
@@ -546,7 +548,7 @@ function RecentRatingMatches({
       <summary className="player-recent-heading">
         <span>
           <strong>Partidos usados para el nivel</strong>
-          <small>{games.length}/10 · últimos 90 días</small>
+          <small>{games.length}/10 · últimos 95 días</small>
         </span>
         <ChevronDown aria-hidden="true" />
       </summary>

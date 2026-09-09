@@ -49,19 +49,25 @@ class RatingTests(unittest.TestCase):
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
 
-    def test_old_matches_are_excluded(self):
+    def test_matches_older_than_ninety_five_days_are_excluded(self):
         for index in range(5):
             self.add(index + 1, f"2026-05-{20 + index:02d}", "1")
         rating = player_ratings(self.connection, date(2026, 9, 6))[1]
         self.assertEqual(0, rating["recentMatches"])
         self.assertEqual(5.25, rating["current"])
 
-    def test_matches_between_sixty_and_ninety_days_are_included(self):
+    def test_matches_inside_ninety_five_days_are_included(self):
         for index in range(5):
             self.add(index + 1, f"2026-06-{10 + index:02d}", "1")
         rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
+
+    def test_ninety_five_day_boundary_is_inclusive_and_day_ninety_six_is_excluded(self):
+        self.add(1, "2026-06-03", "1")  # 95 days before the reference date.
+        self.add(2, "2026-06-02", "1")  # 96 days before the reference date.
+        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
+        self.assertEqual(1, rating["recentMatches"])
 
     def test_three_consecutive_absences_reduce_form_by_ten_percentage_points(self):
         for index in range(5):

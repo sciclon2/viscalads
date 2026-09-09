@@ -144,6 +144,7 @@ newest first; it is not browser cache.
 - Local player photos with initials as the fallback.
 - Player profile cards with personal and football information.
 - Competition-scoped player directory with large profile cards and audited editing of identity, personal details, positions, active status and global rating range.
+- Player achievement showcase rebuilt dynamically from verified history. Achievements aggregate tournament editions inside the selected competition, but never mix Sarrià with Bogatell. It includes 60/100 appearances, Champion and undefeated-champion patches, winning and unbeaten streak levels, goals, attendance, partnerships, nemeses and sustained Prime Moment appearances; removed or unverified matches cannot award a patch. The team-builder preview can also identify a verified patch threshold that the proposed match may unlock or improve.
 - Dedicated venue section with official/alternate grounds, practical information and Google Maps links.
 - Date-aware venue galleries for team, match and celebration photos.
 - Eight-player-per-team formations with three defenders, at least three midfielders and a rotating goalkeeper.
@@ -166,7 +167,7 @@ newest first; it is not browser cache.
 - Corrections are recorded in `audit_events` rather than silently replacing history.
 - Generated files are disposable and must be reproducible from SQLite.
 - Historical CSV files are decommissioned and cannot rebuild or overwrite the database.
-- A player has one position-independent level range in `player_rating_ranges`. The current level uses at most the latest 10 verified matches from the selected competition over the preceding 90 days, crossing tournament editions but never mixing Sarrià with Bogatell. With fewer than 5 eligible matches it stays at the range midpoint; with 5 to 9, missing matches are neutral (0.5). A win scores 1, a draw 0.5 and a loss 0, and the result is always bounded by the configured range.
+- A player has one position-independent level range in `player_rating_ranges`. The current level uses at most the latest 10 verified matches from the selected competition over the preceding 95 days, crossing tournament editions but never mixing Sarrià with Bogatell. With fewer than 5 eligible matches it stays at the range midpoint; with 5 to 9, missing matches are neutral (0.5). A win scores 1, a draw 0.5 and a loss 0, and the result is always bounded by the configured range.
 
 ## Routine update
 

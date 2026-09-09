@@ -83,3 +83,13 @@ test('los datos del torneo respetan la edición seleccionada y los equipos propu
   assert.match(facts[0].text, /T1/);
   assert.equal(prematchFacts(games, ['Ana', 'Bea'], [], [], tournamentRules, games, 'T1').length, 0);
 });
+
+test('avisa cuando el próximo resultado puede desbloquear un parche sin mezclar competiciones', () => {
+  const achievementRule: FactRule[] = [{ code: 'achievement_watch', title: 'Parche en juego', description: '', priority: 1 }];
+  const games = [
+    game('2026-01-01', '1'), game('2026-01-08', '1'), game('2026-01-15', '1'), game('2026-01-22', '1'),
+  ];
+  const fact = prematchFacts(games, ['Ana'], ['Bea'], [], achievementRule)[0];
+  assert.equal(fact.code, 'achievement_watch');
+  assert.match(fact.text, /Ana.*Racha ganadora.*5 victorias/);
+});

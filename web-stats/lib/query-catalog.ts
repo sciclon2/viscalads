@@ -54,7 +54,7 @@ export const queryCatalog: QueryDefinition[] = [
     label: 'Ranking de momento actual',
     description: 'Jugadores ordenados por su nivel actual dentro de su rango.',
     details:
-      'Ordena por el nivel actual de cada jugador. Ese valor se mueve dentro de su rango según hasta los últimos 10 partidos de esta competición en 90 días; todos pesan igual. Con menos de 5 partidos, queda en el punto medio del rango.',
+      'Ordena por el nivel actual de cada jugador. Ese valor se mueve dentro de su rango según hasta los últimos 10 partidos de esta competición en 95 días; todos pesan igual. Con menos de 5 partidos, queda en el punto medio del rango.',
     icon: Activity,
     supportsMinimum: true,
     supportsOrder: true,
@@ -84,7 +84,7 @@ export const queryCatalog: QueryDefinition[] = [
     label: 'Nivel actual',
     description: 'El nivel dinámico que usamos para equilibrar los equipos.',
     details:
-      'Usa como máximo los últimos 10 partidos jugados dentro de los últimos 90 días. Todos pesan igual: una victoria vale 1, un empate 0,5 y una derrota 0. Si hay entre 5 y 9 partidos, los lugares restantes son neutrales (0,5); con menos de 5, el jugador queda en el punto medio de su rango.',
+      'Usa como máximo los últimos 10 partidos jugados dentro de los últimos 95 días. Todos pesan igual: una victoria vale 1, un empate 0,5 y una derrota 0. Si hay entre 5 y 9 partidos, los lugares restantes son neutrales (0,5); con menos de 5, el jugador queda en el punto medio de su rango.',
     icon: Activity,
     supportsMinimum: true,
     supportsOrder: true,

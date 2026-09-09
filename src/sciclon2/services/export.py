@@ -7,6 +7,7 @@ from pathlib import Path
 from ..repositories.history import champions, competitions, matches, profiles, venues
 from .statistics import build_statistics
 from .ratings import player_ratings
+from .achievements import player_achievements
 from .rotation import consecutive_appearances
 from .tournaments import list_tournaments
 
@@ -34,6 +35,7 @@ def web_payload(connection: sqlite3.Connection) -> dict:
             **scoped_stats,
             "ratings": player_ratings(connection, competition=slug),
             "appearanceStreaks": consecutive_appearances(connection, slug),
+            "achievements": player_achievements(connection, slug),
             "games": [game for game in public_games if game["competition"] == slug],
             "champions": [item for item in champions(connection) if any(
                 game["tournament"] == item["tournament"] for game in scoped_games
@@ -62,6 +64,7 @@ def web_payload(connection: sqlite3.Connection) -> dict:
             "nationality": p["nationality"], "preferredFoot": p["preferred_foot"],
             "bio": p["bio"],
             "rating": ratings.get(p["id"]),
+            "achievements": [],
         } for p in profile_rows],
         "tournaments": stats["tournaments"], "pairs": stats["pairs"],
         "trios": stats["trios"], "champions": champions(connection),

@@ -164,6 +164,7 @@ export function TeamBuilder({
       primary: guestPosition,
       alternate: '',
       rating: null,
+      achievements: [],
       level,
       played: 0,
       lastDate: '—',
@@ -372,7 +373,7 @@ export function TeamBuilder({
                 title={
                   player.rating?.dynamic
                     ? `${player.rating.recentMatches} partidos válidos en ${player.rating.windowDays} días`
-                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 90} días`
+                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 95} días`
                 }
               >
                 {player.level.toFixed(2)}

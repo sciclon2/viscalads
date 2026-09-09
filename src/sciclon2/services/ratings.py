@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, timedelta
 
-RATING_WINDOW_DAYS = 90
+RATING_WINDOW_DAYS = 95
 MIN_MATCHES = 5
 MAX_MATCHES = 10
 NEUTRAL_SCORE = 0.5
