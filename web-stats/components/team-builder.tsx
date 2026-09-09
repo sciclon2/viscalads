@@ -19,6 +19,12 @@ import { splitBalancedTeams, type BalancedTeams } from '@/lib/team-balancer';
 import { currentTournamentLeaders, prematchFacts, type FactRule, type PrematchFact } from '@/lib/prematch-facts';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
 import { isTournamentClosedOn } from '@/lib/tournament-dates';
+import {
+  FRIENDLY_MODE,
+  isBuilderSelectionAvailable,
+  isFriendlyMode,
+  persistsCompetitiveData,
+} from '@/lib/match-mode';
 
 type Player = Pick<
   Profile,
@@ -48,7 +54,6 @@ type ParsedLine = {
   rotationReason?: string;
 };
 type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; rotationChanges: number; complete: boolean };
-const FRIENDLY_MODE = '__friendly__';
 
 export function TeamBuilder({
   games,
@@ -112,14 +117,14 @@ export function TeamBuilder({
   const [selectedTournament, setSelectedTournament] = useState(currentTournament?.displayName ?? FRIENDLY_MODE);
   useEffect(() => {
     setSelectedTournament((selected) =>
-      selected === FRIENDLY_MODE || availableTournaments.some((item) => item.displayName === selected)
+      isBuilderSelectionAvailable(selected, availableTournaments.map((item) => item.displayName))
         ? selected
         : (currentTournament?.displayName ?? FRIENDLY_MODE),
     );
   }, [availableTournaments, currentTournament]);
   const tournamentState = useMemo(
     () => currentTournamentLeaders(
-      selectedTournament === FRIENDLY_MODE
+      isFriendlyMode(selectedTournament)
         ? []
         : validGames.filter((game) => game.tournament === selectedTournament),
     ),
@@ -229,8 +234,8 @@ export function TeamBuilder({
     setPasteOpen(false);
   };
   const create = async () => {
-    const friendly = selectedTournament === FRIENDLY_MODE;
-    if (!friendly && !availableTournaments.some((item) => item.displayName === selectedTournament)) {
+    const friendly = isFriendlyMode(selectedTournament);
+    if (!isBuilderSelectionAvailable(selectedTournament, availableTournaments.map((item) => item.displayName))) {
       setMessage('No hay un torneo abierto para armar equipos. Creá el próximo torneo primero.');
       return;
     }
@@ -250,7 +255,7 @@ export function TeamBuilder({
     setFacts(null);
     setMessage('');
     setLineupSaved(false);
-    if (friendly) {
+    if (!persistsCompetitiveData(selectedTournament)) {
       setMessage('Amistoso: se equilibraron los equipos, pero la formación no se guardará para registrar estadísticas.');
       return;
     }
@@ -517,10 +522,10 @@ export function TeamBuilder({
             <BalanceExplanation
               teams={teams}
               tournament={selectedTournament}
-              friendly={selectedTournament === FRIENDLY_MODE}
+              friendly={isFriendlyMode(selectedTournament)}
               leaders={tournamentState.matchDays >= 3 ? tournamentState.leaders.slice(0, 4).map(([name]) => name) : []}
             />
-            {selectedTournament !== FRIENDLY_MODE && <div className="prematch-facts-action">
+            {persistsCompetitiveData(selectedTournament) && <div className="prematch-facts-action">
               <button
                 type="button"
                 onClick={() => setFacts(prematchFacts(
@@ -537,7 +542,7 @@ export function TeamBuilder({
               </button>
               <span>Se calculan localmente con el historial de {competition}.</span>
             </div>}
-            {selectedTournament !== FRIENDLY_MODE && facts && (
+            {persistsCompetitiveData(selectedTournament) && facts && (
               <section className="prematch-facts">
                 <header>
                   <span>Sin IA · datos del historial</span>
