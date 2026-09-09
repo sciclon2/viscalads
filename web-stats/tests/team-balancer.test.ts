@@ -173,3 +173,11 @@ test('reparte cuatro jugadores de punta dos por equipo cuando el balance lo perm
   assert.equal(result.a.filter((item) => leaders.includes(item.name)).length, 2);
   assert.equal(result.b.filter((item) => leaders.includes(item.name)).length, 2);
 });
+
+test('con tres líderes deja al primero del lado con menos punteros', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  const leaders = ['P1', 'P2', 'P3'];
+  const result = splitBalancedTeams(players, [], { leaders });
+  const topTeam = result.a.some((item) => item.name === 'P1') ? result.a : result.b;
+  assert.equal(topTeam.filter((item) => leaders.includes(item.name)).length, 1);
+});

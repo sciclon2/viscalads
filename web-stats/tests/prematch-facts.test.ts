@@ -78,10 +78,11 @@ test('los datos del torneo respetan la edición seleccionada y los equipos propu
     tournamentGame('2026-01-15', 'T1', '1'),
     tournamentGame('2026-02-01', 'T2', '2'),
   ];
-  const facts = prematchFacts(games, ['Ana'], ['Bea'], [], tournamentRules, games, 'T1');
+  const facts = prematchFacts(games, ['Ana'], ['Bea'], [], tournamentRules, games, 'T1', ['Ana', 'Bea']);
   assert.equal(facts.length, 1);
   assert.match(facts[0].text, /T1/);
-  assert.equal(prematchFacts(games, ['Ana', 'Bea'], [], [], tournamentRules, games, 'T1').length, 0);
+  assert.equal(prematchFacts(games, ['Ana', 'Bea'], [], [], tournamentRules, games, 'T1', ['Ana', 'Bea']).length, 0);
+  assert.equal(prematchFacts(games, ['Ana'], ['Bea'], [], tournamentRules, games, 'T1').length, 0);
 });
 
 test('avisa cuando el próximo resultado puede desbloquear un parche sin mezclar competiciones', () => {

@@ -25,6 +25,7 @@ import {
   isFriendlyMode,
   persistsCompetitiveData,
 } from '@/lib/match-mode';
+import { leaderDistributionGap, separatedTournamentLeaders } from '@/lib/leader-race';
 
 type Player = Pick<
   Profile,
@@ -130,6 +131,19 @@ export function TeamBuilder({
     ),
     [validGames, selectedTournament],
   );
+  const selectedTournamentEdition = availableTournaments.find(
+    (item) => item.displayName === selectedTournament,
+  );
+  const separatedLeaders = useMemo(
+    () => selectedTournamentEdition
+      ? separatedTournamentLeaders(
+          selectedTournamentEdition.standings,
+          tournamentState.matchDays,
+          selectedTournamentEdition.matchdayCount,
+        )
+      : [],
+    [selectedTournamentEdition, tournamentState.matchDays],
+  );
   const [guests, setGuests] = useState<Player[]>([]),
     [guestLevel, setGuestLevel] = useState('5'),
     [guestPosition, setGuestPosition] = useState(''),
@@ -145,7 +159,8 @@ export function TeamBuilder({
     [resolutions, setResolutions] = useState<Record<number, string>>({}),
     [parsing, setParsing] = useState(false),
     [savingLineup, setSavingLineup] = useState(false),
-    [lineupSaved, setLineupSaved] = useState(false);
+    [lineupSaved, setLineupSaved] = useState(false),
+    [leaderRuleApplied, setLeaderRuleApplied] = useState(false);
   const players = useMemo(
     () => [...profilePlayers, ...guests],
     [profilePlayers, guests],
@@ -247,10 +262,16 @@ export function TeamBuilder({
       setMessage('La cantidad debe ser par para formar equipos iguales.');
       return;
     }
-    const leaders = !friendly && tournamentState.matchDays >= 3
-      ? tournamentState.leaders.slice(0, 4).map(([name]) => name)
-      : [];
-    const result = splitBalancedTeams(selectedPlayers, validGames, { leaders });
+    const leaders = friendly ? [] : separatedLeaders.filter((name) => selected.includes(name));
+    const baseline = splitBalancedTeams(selectedPlayers, validGames);
+    const result = leaders.length >= 2
+      ? splitBalancedTeams(selectedPlayers, validGames, { leaders })
+      : baseline;
+    setLeaderRuleApplied(
+      leaders.length >= 2 &&
+        leaderDistributionGap(result.a.map((player) => player.name), result.b.map((player) => player.name), leaders) <
+          leaderDistributionGap(baseline.a.map((player) => player.name), baseline.b.map((player) => player.name), leaders),
+    );
     setTeams(result);
     setFacts(null);
     setMessage('');
@@ -523,7 +544,7 @@ export function TeamBuilder({
               teams={teams}
               tournament={selectedTournament}
               friendly={isFriendlyMode(selectedTournament)}
-              leaders={tournamentState.matchDays >= 3 ? tournamentState.leaders.slice(0, 4).map(([name]) => name) : []}
+              leaders={leaderRuleApplied ? separatedLeaders : []}
             />
             {persistsCompetitiveData(selectedTournament) && <div className="prematch-facts-action">
               <button
@@ -536,6 +557,7 @@ export function TeamBuilder({
                   funnyFactRules,
                   globalGames,
                   selectedTournament,
+                  separatedLeaders,
                 ))}
               >
                 <Flame /> Datos para la previa
@@ -717,10 +739,8 @@ function BalanceExplanation({ teams, tournament, leaders, friendly }: { teams: T
           : 'Las líneas se distribuyeron proporcionalmente.';
   return (
     <div className="balance-explanation">
-      {friendly ? (
+      {friendly && (
         <div><strong>Partido amistoso</strong><span>Este armado busca únicamente equipos parejos. No genera estadísticas ni datos para la previa.</span></div>
-      ) : (
-        <div><strong>Partido del torneo</strong><span>Esta propuesta corresponde a <b>{tournament || 'la edición actual'}</b>. La pelea por la tabla y los líderes se evalúan dentro de esa edición.</span></div>
       )}
       <div>
         <strong>
@@ -758,7 +778,7 @@ function BalanceExplanation({ teams, tournament, leaders, friendly }: { teams: T
         <strong>Química y flexibilidad</strong>
         <span>
           {notablePairsA.length || notablePairsB.length
-            ? `${chemistryNotes.join(' ')} Las duplas positivas y negativas sólo se usan para afinar el equilibrio: no impiden que todos jueguen con todos y nunca pesan más que el nivel o la formación.`
+            ? chemistryNotes.join(' ')
             : 'No había duplas con suficiente historial como para alterar la propuesta.'}{' '}
           Se recurrió a{' '}
           {teams.formationA.alternateUses + teams.formationB.alternateUses}{' '}

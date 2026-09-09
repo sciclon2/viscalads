@@ -1,4 +1,5 @@
 import { bestFormation, type Formation } from './team-formation.ts';
+import { leaderDistributionGap } from './leader-race.ts';
 
 export type BalanceGame = {
   status: string;
@@ -172,10 +173,14 @@ export function splitBalancedTeams<T extends BalancePlayer>(
       Math.abs(countsA.MED - countsB.MED) +
       Math.abs(countsA.DEL - countsB.DEL);
     const invalidPenalty = formationA.valid && formationB.valid ? 0 : 1000;
-    const leaderSet = new Set(options.leaders ?? []);
-    const leadersA = a.filter((player) => leaderSet.has(player.name)).length;
-    const leadersB = b.filter((player) => leaderSet.has(player.name)).length;
-    const leaderPenalty = leaderSet.size >= 2 ? Math.abs(leadersA - leadersB) * 0.12 : 0;
+    const leaderNames = options.leaders ?? [];
+    const leaderPenalty = leaderNames.length >= 2
+      ? leaderDistributionGap(
+          a.map((player) => player.name),
+          b.map((player) => player.name),
+          leaderNames,
+        ) * 0.12
+      : 0;
     const score =
       Math.abs(effectiveA - effectiveB) * 13 +
       positionGap * 0.75 +
