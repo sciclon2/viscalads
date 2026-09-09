@@ -26,6 +26,7 @@ import {
   persistsCompetitiveData,
 } from '@/lib/match-mode';
 import { leaderDistributionGap, separatedTournamentLeaders } from '@/lib/leader-race';
+import { playerMomentExplanation } from '@/lib/team-explanation';
 
 type Player = Pick<
   Profile,
@@ -558,6 +559,7 @@ export function TeamBuilder({
                   globalGames,
                   selectedTournament,
                   separatedLeaders,
+                  selectedTournamentEdition?.standings ?? [],
                 ))}
               >
                 <Flame /> Datos para la previa
@@ -765,24 +767,14 @@ function BalanceExplanation({ teams, tournament, leaders, friendly }: { teams: T
       </div>}
       <div>
         <strong>Momento de los jugadores</strong>
-        <span>
-          {strongA.length || strongB.length
-            ? `Los jugadores que llegan en mejor momento también fueron distribuidos entre los equipos: ${[strongA.length ? `${strongA.map((player) => player.name).join(', ')} en Celeste` : '', strongB.length ? `${strongB.map((player) => player.name).join(', ')} en Rosa` : ''].filter(Boolean).join('; ')}.`
-            : 'No hay grandes diferencias de momento reciente, por lo que pesaron más el nivel y las posiciones.'}{' '}
-          {quietA.length || quietB.length
-            ? 'Quienes están recuperando ritmo quedaron acompañados por compañeros de momento más estable.'
-            : ''}
-        </span>
+        <span>{playerMomentExplanation(strongA, strongB, quietA, quietB)}</span>
       </div>
       <div>
-        <strong>Química y flexibilidad</strong>
+        <strong>Química</strong>
         <span>
           {notablePairsA.length || notablePairsB.length
             ? chemistryNotes.join(' ')
-            : 'No había duplas con suficiente historial como para alterar la propuesta.'}{' '}
-          Se recurrió a{' '}
-          {teams.formationA.alternateUses + teams.formationB.alternateUses}{' '}
-          posiciones alternativas para completar las líneas.
+            : 'No había duplas con suficiente historial como para alterar la propuesta.'}
         </span>
       </div>
       {leaders.length >= 2 && teams.a.some((player) => leaders.includes(player.name)) && teams.b.some((player) => leaders.includes(player.name)) && (

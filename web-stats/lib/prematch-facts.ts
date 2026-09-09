@@ -37,6 +37,7 @@ export function prematchFacts(
   globalGames: Game[] = games,
   selectedTournament?: string,
   separatedLeaders: string[] = [],
+  tournamentStandings: Array<{ name: string; totalPoints: number }> = [],
 ): PrematchFact[] {
   const enabled = new Set(rules.map((rule) => rule.code));
   const title = (code: string) => rules.find((rule) => rule.code === code)?.title ?? code;
@@ -235,13 +236,21 @@ export function prematchFacts(
   }
 
   if (enabled.has('standings_overtake')) {
-    const points = new Map(stats.map((row) => [row.name, row.wins * 3 + row.draws]));
+    const usesTournamentTable = Boolean(selectedTournament && tournamentStandings.length);
+    const points = new Map(
+      usesTournamentTable
+        ? tournamentStandings.map((row) => [row.name, row.totalPoints] as const)
+        : stats.map((row) => [row.name, row.wins * 3 + row.draws] as const),
+    );
     const duel = teamA.flatMap((a) => teamB.map((b) => ({ a, b, pa: points.get(a) ?? 0, pb: points.get(b) ?? 0 })))
       .filter((item) => item.pa !== item.pb && Math.abs(item.pa - item.pb) <= 3)
       .sort((a, b) => Math.abs(a.pa - a.pb) - Math.abs(b.pa - b.pb))[0];
     if (duel) {
       const chasing = duel.pa < duel.pb ? duel.a : duel.b, leader = duel.pa < duel.pb ? duel.b : duel.a;
-      facts.push({ code: 'standings_overtake', title: title('standings_overtake'), scope: 'competition', text: `${chasing} está a ${Math.abs(duel.pa - duel.pb)} punto${Math.abs(duel.pa - duel.pb) === 1 ? '' : 's'} de ${leader}. Una victoria puede cambiar su orden en la tabla de esta competición.` });
+      const scopeLabel = usesTournamentTable
+        ? `la tabla de ${selectedTournament}`
+        : `la tabla histórica de ${competitionGames[0]?.competition ?? 'la competición actual'}`;
+      facts.push({ code: 'standings_overtake', title: title('standings_overtake'), scope: 'competition', text: `${chasing} está a ${Math.abs(duel.pa - duel.pb)} punto${Math.abs(duel.pa - duel.pb) === 1 ? '' : 's'} de ${leader} en ${scopeLabel}. Una victoria puede cambiar el orden entre ambos.` });
     }
   }
   const consolidated = facts.filter((fact) => {

@@ -94,3 +94,15 @@ test('avisa cuando el próximo resultado puede desbloquear un parche sin mezclar
   assert.equal(fact.code, 'achievement_watch');
   assert.match(fact.text, /Ana.*Racha ganadora.*5 victorias/);
 });
+
+test('nombra explícitamente el torneo al comparar posiciones', () => {
+  const standingsRule: FactRule[] = [{ code: 'standings_overtake', title: 'Duelo por la tabla', description: '', priority: 1 }];
+  const games = [{ ...game('2026-01-01', '1'), tournament: 'T11' }];
+  const standings = [
+    { name: 'Ana', totalPoints: 9 },
+    { name: 'Bea', totalPoints: 8 },
+  ];
+  const fact = prematchFacts(games, ['Bea'], ['Ana'], [], standingsRule, games, 'T11', [], standings)[0];
+  assert.match(fact.text, /tabla de T11/);
+  assert.doesNotMatch(fact.text, /esta competición/);
+});
