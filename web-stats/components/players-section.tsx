@@ -7,6 +7,7 @@ import { PlayerAvatar } from '@/components/player-avatar';
 import { PlayerComparison } from '@/components/player-comparison';
 import { PrimeMomentBadge, RockBottomBadge } from '@/components/prime-moment-badge';
 import { AchievementPatches } from '@/components/achievement-patches';
+import { PlayerRatingHistory } from '@/components/player-rating-history';
 import type { CompetitionStats, Game, PlayerStat, Profile } from '@/lib/stats-context';
 import { ratingRangePosition } from '@/lib/player-rating';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
@@ -487,6 +488,7 @@ function PlayerDetails({
       <PrimeMomentBadge rating={r} />
       <RockBottomBadge rating={r} />
       {r && <RatingRange rating={r} />}
+      {r && <PlayerRatingHistory rating={r} points={player.ratingHistory ?? []} />}
       <div className="player-rating-note">
         <ShieldCheck />
         <span>

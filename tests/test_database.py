@@ -24,7 +24,7 @@ class DatabaseTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_database_audit(self):
-        self.assertEqual([], audit(self.connection, expected_matches=184))
+        self.assertEqual([], audit(self.connection, expected_matches=185))
 
     def test_2026_external_reconciliation(self):
         march = self.connection.execute(
@@ -105,7 +105,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(match_count, len(payload["games"]))
         self.assertEqual("data/sciclon2.sqlite3", payload["generatedFrom"])
         self.assertEqual(["sarria", "bogatell"], [item["slug"] for item in payload["competitions"]])
-        self.assertEqual(126, len(payload["competitionStats"]["sarria"]["games"]))
+        self.assertEqual(127, len(payload["competitionStats"]["sarria"]["games"]))
         self.assertEqual(58, len(payload["competitionStats"]["bogatell"]["games"]))
 
     def test_competition_histories_are_isolated(self):
@@ -114,7 +114,7 @@ class DatabaseTests(unittest.TestCase):
             "LEFT JOIN tournaments t ON t.competition_id=c.id "
             "LEFT JOIN matches m ON m.tournament_id=t.id GROUP BY c.slug"
         ).fetchall())
-        self.assertEqual({"sarria": 126, "bogatell": 58}, counts)
+        self.assertEqual({"sarria": 127, "bogatell": 58}, counts)
         wrong_weekday = self.connection.execute(
             "SELECT m.played_on FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
             "JOIN competitions c ON c.id=t.competition_id "

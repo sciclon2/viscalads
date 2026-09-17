@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Eye, Plus, Save, Trash2, Trophy, UserRoundPlus } from 'lucide-react';
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  Eye,
+  Plus,
+  Save,
+  Trash2,
+  Trophy,
+  UserRoundPlus,
+} from 'lucide-react';
 import { API } from '@/components/site-client';
 import { PlayerAvatar } from '@/components/player-avatar';
 import { PitchMarkings } from '@/components/pitch-markings';
@@ -39,28 +49,39 @@ export function MatchEntry({
     () =>
       profiles
         .filter((profile) => profile.competitions.includes(competition))
-        .sort((a, b) =>
-          Number(hasRecentActivity(b.name, games, activityCutoff())) -
-            Number(hasRecentActivity(a.name, games, activityCutoff())) ||
-          a.name.localeCompare(b.name),
+        .sort(
+          (a, b) =>
+            Number(hasRecentActivity(b.name, games, activityCutoff())) -
+              Number(hasRecentActivity(a.name, games, activityCutoff())) ||
+            a.name.localeCompare(b.name),
         ),
     [profiles, competition, games],
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const currentTournament = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const ordered = [...tournaments].sort((a, b) =>
-      (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id,
+    const ordered = [...tournaments].sort(
+      (a, b) =>
+        (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id,
     );
-    return ordered.find((item) =>
-      (item.startsOn ?? '') <= today && (!item.endsOn || item.endsOn >= today),
-    ) ?? ordered[0];
+    return (
+      ordered.find(
+        (item) =>
+          (item.startsOn ?? '') <= today &&
+          (!item.endsOn || item.endsOn >= today),
+      ) ?? ordered[0]
+    );
   }, [tournaments]);
-  const [tournamentId, setTournamentId] = useState<number | null>(currentTournament?.id ?? null);
+  const [tournamentId, setTournamentId] = useState<number | null>(
+    currentTournament?.id ?? null,
+  );
   const [teams, setTeams] = useState<[Member[], Member[]]>([[], []]);
   const [goals, setGoals] = useState<Record<string, number>>({});
   const [presets, setPresets] = useState<Preset[]>([]),
     [message, setMessage] = useState(''),
+    [messageKind, setMessageKind] = useState<'info' | 'success' | 'error'>(
+      'info',
+    ),
     [editing, setEditing] = useState<number | null>(null),
     [viewing, setViewing] = useState<Game | null>(null);
 
@@ -116,20 +137,33 @@ export function MatchEntry({
   };
   function loadPreset(preset: Preset) {
     setTeams([
-      [...preset.team1.map((item) => ({
-        playerId: item.player_id,
-        name: item.canonical_name,
-      })), ...(preset.guest1 || []).map((item) => ({ name: item.guest_label, guestName: item.guest_label }))],
-      [...preset.team2.map((item) => ({
-        playerId: item.player_id,
-        name: item.canonical_name,
-      })), ...(preset.guest2 || []).map((item) => ({ name: item.guest_label, guestName: item.guest_label }))],
+      [
+        ...preset.team1.map((item) => ({
+          playerId: item.player_id,
+          name: item.canonical_name,
+        })),
+        ...(preset.guest1 || []).map((item) => ({
+          name: item.guest_label,
+          guestName: item.guest_label,
+        })),
+      ],
+      [
+        ...preset.team2.map((item) => ({
+          playerId: item.player_id,
+          name: item.canonical_name,
+        })),
+        ...(preset.guest2 || []).map((item) => ({
+          name: item.guest_label,
+          guestName: item.guest_label,
+        })),
+      ],
     ]);
     setGoals({});
     setEditing(null);
     setMessage(
       'Formación cargada. Podés agregar, quitar o cambiar jugadores libremente.',
     );
+    setMessageKind('info');
   }
   const payload = () => ({
     competition,
@@ -159,6 +193,7 @@ export function MatchEntry({
   });
   const save = async () => {
     setMessage('Guardando…');
+    setMessageKind('info');
     const response = await fetch(
       `${API}/matches${editing ? `/${editing}` : ''}`,
       {
@@ -170,11 +205,13 @@ export function MatchEntry({
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
       setMessage(body.error || 'No se pudo guardar');
+      setMessageKind('error');
       return;
     }
     await onSaved();
     setEditing(null);
     setMessage(`Partido guardado: ${score(1)}–${score(2)}.`);
+    setMessageKind('success');
   };
   const edit = (game: Game) => {
     const members = (names: string[], teamNo: number) => [
@@ -188,9 +225,9 @@ export function MatchEntry({
     ];
     setDate(game.date);
     setTournamentId(
-      tournaments.find((item) => item.displayName === game.tournament)?.id
-        ?? currentTournament?.id
-        ?? null,
+      tournaments.find((item) => item.displayName === game.tournament)?.id ??
+        currentTournament?.id ??
+        null,
     );
     setTeams([members(game.team1, 1), members(game.team2, 2)]);
     const next: Record<string, number> = {};
@@ -209,6 +246,7 @@ export function MatchEntry({
     setGoals(next);
     setEditing(game.id);
     setMessage('Editando un partido existente.');
+    setMessageKind('info');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const voidGame = async (game: Game) => {
@@ -226,6 +264,7 @@ export function MatchEntry({
     if (response.ok) {
       await onSaved();
       setMessage('Partido anulado correctamente.');
+      setMessageKind('success');
     }
   };
 
@@ -237,7 +276,10 @@ export function MatchEntry({
       })),
       ...(viewing.guests || [])
         .filter((guest) => guest.team_no === teamNo)
-        .map((guest) => ({ name: guest.guest_label, guestName: guest.guest_label })),
+        .map((guest) => ({
+          name: guest.guest_label,
+          guestName: guest.guest_label,
+        })),
     ];
     const detailTeams: [Member[], Member[]] = [
       members(viewing.team1, 1),
@@ -247,18 +289,31 @@ export function MatchEntry({
       <div className="match-entry-shell match-readonly-detail">
         <div className="match-detail-header">
           <div>
-            <button className="match-detail-back" onClick={() => setViewing(null)}>
+            <button
+              className="match-detail-back"
+              onClick={() => setViewing(null)}
+            >
               ← Volver a partidos
             </button>
             <h3>Detalle del partido</h3>
             <p>
-              {new Date(`${viewing.date}T00:00:00`).toLocaleDateString('es-ES')} · vista de solo lectura
+              {new Date(`${viewing.date}T00:00:00`).toLocaleDateString('es-ES')}{' '}
+              · vista de solo lectura
             </p>
           </div>
-          <button className="match-detail-edit" onClick={() => { setViewing(null); edit(viewing); }}>
+          <button
+            className="match-detail-edit"
+            onClick={() => {
+              setViewing(null);
+              edit(viewing);
+            }}
+          >
             <Eye /> Editar partido
           </button>
-          <button className="match-detail-void" onClick={() => void voidGame(viewing)}>
+          <button
+            className="match-detail-void"
+            onClick={() => void voidGame(viewing)}
+          >
             <Trash2 /> Anular partido
           </button>
         </div>
@@ -293,7 +348,8 @@ export function MatchEntry({
                 tabIndex={0}
                 onClick={() => setViewing(game)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') setViewing(game);
+                  if (event.key === 'Enter' || event.key === ' ')
+                    setViewing(game);
                 }}
               >
                 <span>
@@ -334,7 +390,8 @@ export function MatchEntry({
           >
             {tournaments.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.displayName}{item.id === currentTournament?.id ? ' · Actual' : ''}
+                {item.displayName}
+                {item.id === currentTournament?.id ? ' · Actual' : ''}
               </option>
             ))}
           </select>
@@ -415,13 +472,23 @@ export function MatchEntry({
         />
       </div>
       <div className="match-save">
-        <p>{message}</p>
+        {message && (
+          <p
+            className={`match-save-message match-save-message-${messageKind}`}
+            role={messageKind === 'error' ? 'alert' : 'status'}
+          >
+            {messageKind === 'error' && <AlertCircle aria-hidden="true" />}
+            {messageKind === 'success' && <CheckCircle2 aria-hidden="true" />}
+            <span>{message}</span>
+          </p>
+        )}
         {mode === 'admin' && (
           <button
             className="secondary"
             onClick={() => {
               setEditing(null);
               setMessage('');
+              setMessageKind('info');
             }}
           >
             Cancelar edición
@@ -439,7 +506,13 @@ export function MatchEntry({
   );
 }
 
-function MatchSummary({ game, detailed = false }: { game: Game; detailed?: boolean }) {
+function MatchSummary({
+  game,
+  detailed = false,
+}: {
+  game: Game;
+  detailed?: boolean;
+}) {
   const team = (names: string[], teamNo: number) => [
     ...names,
     ...(game.guests || [])
@@ -447,10 +520,18 @@ function MatchSummary({ game, detailed = false }: { game: Game; detailed?: boole
       .map((guest) => guest.guest_label),
   ];
   return (
-    <div className={detailed ? 'match-summary match-summary-detailed' : 'match-summary'}>
+    <div
+      className={
+        detailed ? 'match-summary match-summary-detailed' : 'match-summary'
+      }
+    >
       <header>
-        <span>{new Date(`${game.date}T00:00:00`).toLocaleDateString('es-ES')}</span>
-        <strong>{game.score1 ?? '?'}–{game.score2 ?? '?'}</strong>
+        <span>
+          {new Date(`${game.date}T00:00:00`).toLocaleDateString('es-ES')}
+        </span>
+        <strong>
+          {game.score1 ?? '?'}–{game.score2 ?? '?'}
+        </strong>
       </header>
       <div className="match-summary-teams">
         <section>
@@ -465,7 +546,14 @@ function MatchSummary({ game, detailed = false }: { game: Game; detailed?: boole
       {detailed && game.goals && game.goals.length > 0 && (
         <div className="match-summary-goals">
           <b>Goles registrados</b>
-          <p>{game.goals.map((goal) => `${goal.player_name || goal.guest_label || 'Sin autor'} (${goal.goal_count})`).join(' · ')}</p>
+          <p>
+            {game.goals
+              .map(
+                (goal) =>
+                  `${goal.player_name || goal.guest_label || 'Sin autor'} (${goal.goal_count})`,
+              )
+              .join(' · ')}
+          </p>
         </div>
       )}
     </div>

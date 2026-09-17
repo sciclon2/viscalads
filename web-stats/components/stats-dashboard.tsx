@@ -168,10 +168,11 @@ export default function StatsDashboard({
       data.profiles.map((profile) => ({
         ...profile,
         rating: scope.ratings[String(profile.id)] ?? null,
+        ratingHistory: scope.ratingHistory?.[String(profile.id)] ?? [],
         achievements: scope.achievements?.[String(profile.id)] ?? [],
         consecutiveAppearances: scope.appearanceStreaks?.[String(profile.id)] ?? 0,
       })),
-    [data.profiles, scope.ratings, scope.achievements, scope.appearanceStreaks],
+    [data.profiles, scope.ratings, scope.ratingHistory, scope.achievements, scope.appearanceStreaks],
   );
   const playerNames = useMemo(
     () => scope.players.map((p) => p.name).sort(),

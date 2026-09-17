@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from sciclon2.config import DEFAULT_DB
@@ -77,6 +78,47 @@ class TournamentTests(unittest.TestCase):
         self.assertEqual(1, self.connection.execute(
             "SELECT COUNT(*) FROM audit_events WHERE entity_type='tournament' AND entity_id=?", (item_id,)
         ).fetchone()[0])
+
+    def test_open_standings_include_only_recent_active_players_who_have_not_played(self):
+        tournament_id = create_tournament(self.connection, "sarria", {
+            "displayName": "Torneo todavía vacío", "startsOn": "2027-03-01",
+            "matchdayCount": 4, "ruleCode": "none",
+        })
+        latest_match = self.connection.execute(
+            "SELECT MAX(m.played_on) FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+            "JOIN competitions c ON c.id=t.competition_id "
+            "WHERE c.slug='sarria' AND m.voided_at IS NULL AND m.coverage_status='verified'"
+        ).fetchone()[0]
+        cutoff = (date.fromisoformat(latest_match) - timedelta(days=90)).isoformat()
+        recent_players = self.connection.execute(
+            "SELECT COUNT(DISTINCT cp.player_id) FROM competition_players cp "
+            "JOIN competitions c ON c.id=cp.competition_id "
+            "JOIN match_players mp ON mp.player_id=cp.player_id "
+            "JOIN matches m ON m.id=mp.match_id JOIN tournaments t ON t.id=m.tournament_id "
+            "WHERE c.slug='sarria' AND cp.active=1 AND t.competition_id=c.id "
+            "AND m.voided_at IS NULL AND m.coverage_status='verified' AND m.played_on>=?",
+            (cutoff,),
+        ).fetchone()[0]
+
+        table = tournament_standings(self.connection, tournament_id)
+
+        self.assertEqual(recent_players, len(table))
+        self.assertTrue(all(
+            row["played"] == 0 and row["totalPoints"] == 0 for row in table
+        ))
+        self.assertEqual([], calculated_tournament_champions(self.connection, tournament_id))
+
+    def test_closed_standings_keep_only_that_tournament_participants(self):
+        tournament_id = self.connection.execute(
+            "SELECT id FROM tournaments WHERE code='T1 Oct23-Feb24'"
+        ).fetchone()[0]
+        table = tournament_standings(self.connection, tournament_id)
+        participants = self.connection.execute(
+            "SELECT COUNT(DISTINCT mp.player_id) FROM match_players mp "
+            "JOIN matches m ON m.id=mp.match_id WHERE m.tournament_id=? AND m.voided_at IS NULL",
+            (tournament_id,),
+        ).fetchone()[0]
+        self.assertEqual(participants, len(table))
 
     def test_wide_loss_penalty_is_tournament_only_and_can_go_negative(self):
         tournament_id = create_tournament(self.connection, "sarria", {

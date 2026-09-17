@@ -4,7 +4,7 @@ Viscalads is a local-first football history, statistics and balanced-team projec
 
 The repository is private by design. Original WhatsApp exports, private media and OCR scratch files must never be committed. Curated competition and player images used by the interface live under `web-stats/public/` and may be versioned deliberately.
 
-Current release: `v1.1.0`. This stable release adds tournament standings and immutable rules, dynamic champions, player form and rotation tracking, WhatsApp lineup parsing, richer team balancing and prematch facts, while preserving the SQLite-first workflow and automated regression suite.
+Current release: `v1.2.0`. This stable release adds player achievement patches and rating evolution, clearer prematch insights, friendly matches, safer match entry, and tournament tables that include recently active players even before their first appearance, while preserving the SQLite-first workflow and automated regression suite.
 
 ## Architecture
 

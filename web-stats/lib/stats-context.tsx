@@ -15,6 +15,20 @@ export type PlayerRating = {
   absencePenalty: boolean;
   absencePenaltyPercent: number;
 };
+export type PlayerRatingPoint = {
+  date: string;
+  tournament: string;
+  current: number;
+  formScore: number;
+  recentMatches: number;
+  dynamic: boolean;
+  missedMatches: number;
+  absencePenalty: boolean;
+  participated: boolean;
+  result: 'W' | 'D' | 'L' | null;
+  score1: number | null;
+  score2: number | null;
+};
 export type Profile = {
   id: number;
   name: string;
@@ -33,6 +47,7 @@ export type Profile = {
   preferredFoot: string;
   bio: string;
   rating: PlayerRating | null;
+  ratingHistory?: PlayerRatingPoint[];
   consecutiveAppearances?: number;
   achievements: {
     code: string;
@@ -136,6 +151,7 @@ export type CompetitionStats = {
   }[];
   venues: Venue[];
   ratings: Record<string, PlayerRating>;
+  ratingHistory: Record<string, PlayerRatingPoint[]>;
   appearanceStreaks: Record<string, number>;
   achievements: Record<string, Profile['achievements']>;
 };
