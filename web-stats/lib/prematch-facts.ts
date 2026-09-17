@@ -36,6 +36,8 @@ export function prematchFacts(
   rules: FactRule[],
   globalGames: Game[] = games,
   selectedTournament?: string,
+  separatedLeaders: string[] = [],
+  tournamentStandings: Array<{ name: string; totalPoints: number }> = [],
 ): PrematchFact[] {
   const enabled = new Set(rules.map((rule) => rule.code));
   const title = (code: string) => rules.find((rule) => rule.code === code)?.title ?? code;
@@ -58,14 +60,16 @@ export function prematchFacts(
       facts.push({ code: 'tournament_winless', title: title('tournament_winless'), scope: 'competition', text: `${winless.name} todavía no ganó en ${currentTournament} tras ${winless.results.length} partidos. Este puede ser el día de cortar la espera.` });
     if (enabled.has('leader_clash')) {
       const tournamentState = currentTournamentLeaders(tournamentGames);
-      const leaders = tournamentState.leaders.slice(0, 2);
-      if (tournamentState.matchDays >= 3 && leaders.length === 2 && inProposedOppositeTeams(leaders[0][0], leaders[1][0], teamA, teamB))
+      const leaders = tournamentState.leaders.filter(([name]) => separatedLeaders.includes(name)).slice(0, 2);
+      if (leaders.length === 2 && inProposedOppositeTeams(leaders[0][0], leaders[1][0], teamA, teamB))
         facts.push({ code: 'leader_clash', title: title('leader_clash'), scope: 'competition', text: `${leaders[0][0]} (${leaders[0][1]} pts) y ${leaders[1][0]} (${leaders[1][1]} pts), los dos primeros de ${currentTournament}, quedaron enfrentados directamente.` });
     }
   }
 
   const appearances = new Map<string, number>();
   verified.forEach((game) => [...game.team1, ...game.team2].forEach((name) => appearances.set(name, (appearances.get(name) ?? 0) + 1)));
+  const competitionAppearances = new Map<string, number>();
+  competitionGames.forEach((game) => [...game.team1, ...game.team2].forEach((name) => competitionAppearances.set(name, (competitionAppearances.get(name) ?? 0) + 1)));
   if (enabled.has('team_experience')) {
     const totalA = teamA.reduce((sum, name) => sum + (appearances.get(name) ?? 0), 0);
     const totalB = teamB.reduce((sum, name) => sum + (appearances.get(name) ?? 0), 0);
@@ -90,8 +94,53 @@ export function prematchFacts(
   }
 
   if (enabled.has('century_watch')) {
-    const century = [...teamA, ...teamB].map((name) => ({ name, played: appearances.get(name) ?? 0 })).find((item) => item.played === 99);
-    if (century) facts.push({ code: 'century_watch', title: title('century_watch'), scope: 'global', text: `${century.name} disputará su partido número 100 si juega esta propuesta.` });
+    const century = [...teamA, ...teamB].map((name) => ({ name, played: competitionAppearances.get(name) ?? 0 })).find((item) => item.played === 99);
+    if (century) facts.push({ code: 'century_watch', title: title('century_watch'), scope: 'competition', text: `${century.name} disputará su partido número 100 si juega esta propuesta.` });
+  }
+
+  if (enabled.has('achievement_watch')) {
+    const thresholds = {
+      winning: [5, 7, 10], unbeaten: [5, 8, 12, 15], veteran: [60, 100], partnership: [10, 20, 30], nemesis: [5, 7, 10],
+    };
+    const proposed = [...teamA, ...teamB];
+    const opportunities: string[] = [];
+    for (const name of proposed) {
+      const played = competitionAppearances.get(name) ?? 0;
+      if (thresholds.veteran.includes(played + 1)) {
+        const patch = played + 1 === 60 ? 'Veterano' : 'Centenario';
+        opportunities.push(`${name} desbloqueará ${patch} si juega: alcanzará ${played + 1} partidos en esta competencia.`);
+      }
+      const results = competitionGames.filter((game) => inTeam(game, name)).map((game) => resultFor(game, name)).filter(Boolean).reverse();
+      const currentWins = results.findIndex((result) => result !== 'W');
+      const winStreak = currentWins === -1 ? results.length : currentWins;
+      if (thresholds.winning.includes(winStreak + 1)) {
+        opportunities.push(`${name} puede desbloquear o mejorar Racha ganadora si gana: llegaría a ${winStreak + 1} victorias consecutivas.`);
+      }
+      const firstLoss = results.findIndex((result) => result === 'L');
+      const unbeatenStreak = firstLoss === -1 ? results.length : firstLoss;
+      if (thresholds.unbeaten.includes(unbeatenStreak + 1)) {
+        opportunities.push(`${name} puede desbloquear o mejorar Invicto si gana o empata: llegaría a ${unbeatenStreak + 1} partidos sin perder. Una derrota cortaría la racha.`);
+      }
+    }
+    for (const team of [teamA, teamB]) {
+      for (let index = 0; index < team.length; index++) for (const partner of team.slice(index + 1)) {
+        const first = team[index];
+        const winsTogether = competitionGames.filter((game) =>
+          inTeam(game, first) && inTeam(game, first) === inTeam(game, partner) && resultFor(game, first) === 'W'
+        ).length;
+        if (thresholds.partnership.includes(winsTogether + 1)) {
+          opportunities.push(`${first} y ${partner} pueden desbloquear o mejorar Sociedad si ganan juntos: llegarían a ${winsTogether + 1} victorias como dupla.`);
+        }
+      }
+    }
+    for (const first of teamA) for (const rival of teamB) {
+      const meetings = competitionGames.filter((game) => inTeam(game, first) && inTeam(game, rival) && inTeam(game, first) !== inTeam(game, rival));
+      const firstWins = meetings.filter((game) => resultFor(game, first) === 'W').length;
+      const rivalWins = meetings.filter((game) => resultFor(game, rival) === 'W').length;
+      if (thresholds.nemesis.includes(firstWins + 1)) opportunities.push(`${first} puede desbloquear o mejorar Bestia negra ante ${rival} si gana: sería su victoria número ${firstWins + 1}.`);
+      if (thresholds.nemesis.includes(rivalWins + 1)) opportunities.push(`${rival} puede desbloquear o mejorar Bestia negra ante ${first} si gana: sería su victoria número ${rivalWins + 1}.`);
+    }
+    if (opportunities.length) facts.push({ code: 'achievement_watch', title: title('achievement_watch'), scope: 'competition', text: opportunities[0] });
   }
 
   if (enabled.has('hot_pair')) {
@@ -187,13 +236,21 @@ export function prematchFacts(
   }
 
   if (enabled.has('standings_overtake')) {
-    const points = new Map(stats.map((row) => [row.name, row.wins * 3 + row.draws]));
+    const usesTournamentTable = Boolean(selectedTournament && tournamentStandings.length);
+    const points = new Map(
+      usesTournamentTable
+        ? tournamentStandings.map((row) => [row.name, row.totalPoints] as const)
+        : stats.map((row) => [row.name, row.wins * 3 + row.draws] as const),
+    );
     const duel = teamA.flatMap((a) => teamB.map((b) => ({ a, b, pa: points.get(a) ?? 0, pb: points.get(b) ?? 0 })))
       .filter((item) => item.pa !== item.pb && Math.abs(item.pa - item.pb) <= 3)
       .sort((a, b) => Math.abs(a.pa - a.pb) - Math.abs(b.pa - b.pb))[0];
     if (duel) {
       const chasing = duel.pa < duel.pb ? duel.a : duel.b, leader = duel.pa < duel.pb ? duel.b : duel.a;
-      facts.push({ code: 'standings_overtake', title: title('standings_overtake'), scope: 'competition', text: `${chasing} está a ${Math.abs(duel.pa - duel.pb)} punto${Math.abs(duel.pa - duel.pb) === 1 ? '' : 's'} de ${leader}. Una victoria puede cambiar su orden en la tabla de esta competición.` });
+      const scopeLabel = usesTournamentTable
+        ? `la tabla de ${selectedTournament}`
+        : `la tabla histórica de ${competitionGames[0]?.competition ?? 'la competición actual'}`;
+      facts.push({ code: 'standings_overtake', title: title('standings_overtake'), scope: 'competition', text: `${chasing} está a ${Math.abs(duel.pa - duel.pb)} punto${Math.abs(duel.pa - duel.pb) === 1 ? '' : 's'} de ${leader} en ${scopeLabel}. Una victoria puede cambiar el orden entre ambos.` });
     }
   }
   const consolidated = facts.filter((fact) => {

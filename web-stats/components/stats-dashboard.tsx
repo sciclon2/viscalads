@@ -168,9 +168,11 @@ export default function StatsDashboard({
       data.profiles.map((profile) => ({
         ...profile,
         rating: scope.ratings[String(profile.id)] ?? null,
+        ratingHistory: scope.ratingHistory?.[String(profile.id)] ?? [],
+        achievements: scope.achievements?.[String(profile.id)] ?? [],
         consecutiveAppearances: scope.appearanceStreaks?.[String(profile.id)] ?? 0,
       })),
-    [data.profiles, scope.ratings],
+    [data.profiles, scope.ratings, scope.ratingHistory, scope.achievements, scope.appearanceStreaks],
   );
   const playerNames = useMemo(
     () => scope.players.map((p) => p.name).sort(),
@@ -1174,7 +1176,7 @@ function FormResults({ rows }: { rows: FormRow[] }) {
       )}
       <p className="border-t border-[#173d2a]/10 px-4 py-3 text-sm text-muted-foreground">
         La secuencia empieza por el último partido. Se usan hasta 10 partidos de
-        los últimos 90 días. Con menos de 5, el nivel queda neutral; entre 5 y
+        los últimos 95 días. Con menos de 5, el nivel queda neutral; entre 5 y
         9, los partidos faltantes valen 0,5. Alto: 60% o más · neutral: 40% a
         59,9% · bajo: menos de 40%.
       </p>
@@ -1193,7 +1195,7 @@ function formRows(
   const referenceDate = new Date();
   referenceDate.setHours(0, 0, 0, 0);
   const cutoff = new Date(referenceDate);
-  cutoff.setDate(cutoff.getDate() - 90);
+  cutoff.setDate(cutoff.getDate() - 95);
   const today = referenceDate.toISOString().slice(0, 10);
   const cutoffDate = cutoff.toISOString().slice(0, 10);
   const allValid = [...games]

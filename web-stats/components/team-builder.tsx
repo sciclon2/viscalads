@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ClipboardPaste, Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,15 @@ import {
 import { splitBalancedTeams, type BalancedTeams } from '@/lib/team-balancer';
 import { currentTournamentLeaders, prematchFacts, type FactRule, type PrematchFact } from '@/lib/prematch-facts';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
+import { isTournamentClosedOn } from '@/lib/tournament-dates';
+import {
+  FRIENDLY_MODE,
+  isBuilderSelectionAvailable,
+  isFriendlyMode,
+  persistsCompetitiveData,
+} from '@/lib/match-mode';
+import { leaderDistributionGap, separatedTournamentLeaders } from '@/lib/leader-race';
+import { playerMomentExplanation } from '@/lib/team-explanation';
 
 type Player = Pick<
   Profile,
@@ -96,19 +105,45 @@ export function TeamBuilder({
         ),
     [validGames, profiles, competition],
   );
+  const today = new Date().toISOString().slice(0, 10);
+  const availableTournaments = useMemo(() => {
+    return [...tournaments]
+      .filter((item) => !isTournamentClosedOn(item.endsOn, today))
+      .sort((a, b) => (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id);
+  }, [tournaments, today]);
   const currentTournament = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const ordered = [...tournaments].sort((a, b) =>
-      (b.startsOn ?? '').localeCompare(a.startsOn ?? '') || b.id - a.id,
-    );
-    return ordered.find((item) =>
+    return availableTournaments.find((item) =>
       (item.startsOn ?? '') <= today && (!item.endsOn || item.endsOn >= today),
-    ) ?? ordered[0];
-  }, [tournaments]);
-  const [selectedTournament, setSelectedTournament] = useState(currentTournament?.displayName ?? '');
+    ) ?? availableTournaments[0];
+  }, [availableTournaments, today]);
+  const [selectedTournament, setSelectedTournament] = useState(currentTournament?.displayName ?? FRIENDLY_MODE);
+  useEffect(() => {
+    setSelectedTournament((selected) =>
+      isBuilderSelectionAvailable(selected, availableTournaments.map((item) => item.displayName))
+        ? selected
+        : (currentTournament?.displayName ?? FRIENDLY_MODE),
+    );
+  }, [availableTournaments, currentTournament]);
   const tournamentState = useMemo(
-    () => currentTournamentLeaders(validGames.filter((game) => game.tournament === selectedTournament)),
+    () => currentTournamentLeaders(
+      isFriendlyMode(selectedTournament)
+        ? []
+        : validGames.filter((game) => game.tournament === selectedTournament),
+    ),
     [validGames, selectedTournament],
+  );
+  const selectedTournamentEdition = availableTournaments.find(
+    (item) => item.displayName === selectedTournament,
+  );
+  const separatedLeaders = useMemo(
+    () => selectedTournamentEdition
+      ? separatedTournamentLeaders(
+          selectedTournamentEdition.standings,
+          tournamentState.matchDays,
+          selectedTournamentEdition.matchdayCount,
+        )
+      : [],
+    [selectedTournamentEdition, tournamentState.matchDays],
   );
   const [guests, setGuests] = useState<Player[]>([]),
     [guestLevel, setGuestLevel] = useState('5'),
@@ -125,7 +160,8 @@ export function TeamBuilder({
     [resolutions, setResolutions] = useState<Record<number, string>>({}),
     [parsing, setParsing] = useState(false),
     [savingLineup, setSavingLineup] = useState(false),
-    [lineupSaved, setLineupSaved] = useState(false);
+    [lineupSaved, setLineupSaved] = useState(false),
+    [leaderRuleApplied, setLeaderRuleApplied] = useState(false);
   const players = useMemo(
     () => [...profilePlayers, ...guests],
     [profilePlayers, guests],
@@ -164,6 +200,7 @@ export function TeamBuilder({
       primary: guestPosition,
       alternate: '',
       rating: null,
+      achievements: [],
       level,
       played: 0,
       lastDate: '—',
@@ -213,6 +250,11 @@ export function TeamBuilder({
     setPasteOpen(false);
   };
   const create = async () => {
+    const friendly = isFriendlyMode(selectedTournament);
+    if (!isBuilderSelectionAvailable(selectedTournament, availableTournaments.map((item) => item.displayName))) {
+      setMessage('No hay un torneo abierto para armar equipos. Creá el próximo torneo primero.');
+      return;
+    }
     if (selected.length < 8) {
       setMessage('Seleccioná al menos 8 jugadores.');
       return;
@@ -221,14 +263,24 @@ export function TeamBuilder({
       setMessage('La cantidad debe ser par para formar equipos iguales.');
       return;
     }
-    const leaders = tournamentState.matchDays >= 3
-      ? tournamentState.leaders.slice(0, 4).map(([name]) => name)
-      : [];
-    const result = splitBalancedTeams(selectedPlayers, validGames, { leaders });
+    const leaders = friendly ? [] : separatedLeaders.filter((name) => selected.includes(name));
+    const baseline = splitBalancedTeams(selectedPlayers, validGames);
+    const result = leaders.length >= 2
+      ? splitBalancedTeams(selectedPlayers, validGames, { leaders })
+      : baseline;
+    setLeaderRuleApplied(
+      leaders.length >= 2 &&
+        leaderDistributionGap(result.a.map((player) => player.name), result.b.map((player) => player.name), leaders) <
+          leaderDistributionGap(baseline.a.map((player) => player.name), baseline.b.map((player) => player.name), leaders),
+    );
     setTeams(result);
     setFacts(null);
     setMessage('');
     setLineupSaved(false);
+    if (!persistsCompetitiveData(selectedTournament)) {
+      setMessage('Amistoso: se equilibraron los equipos, pero la formación no se guardará para registrar estadísticas.');
+      return;
+    }
     setSavingLineup(true);
     try {
       const response = await fetch(`${API}/lineups`, {
@@ -372,7 +424,7 @@ export function TeamBuilder({
                 title={
                   player.rating?.dynamic
                     ? `${player.rating.recentMatches} partidos válidos en ${player.rating.windowDays} días`
-                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 90} días`
+                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 95} días`
                 }
               >
                 {player.level.toFixed(2)}
@@ -449,7 +501,8 @@ export function TeamBuilder({
             onChange={(event) => { setSelectedTournament(event.target.value); setTeams(null); setFacts(null); setLineupSaved(false); }}
             className="mt-2 h-10 w-full rounded-md border bg-white px-3 font-normal"
           >
-            {tournaments.map((item) => (
+            <option value={FRIENDLY_MODE}>Amistoso · sin estadísticas</option>
+            {availableTournaments.map((item) => (
               <option key={item.id} value={item.displayName}>
                 {item.displayName}{item.id === currentTournament?.id ? ' · Actual' : ''}
               </option>
@@ -491,9 +544,10 @@ export function TeamBuilder({
             <BalanceExplanation
               teams={teams}
               tournament={selectedTournament}
-              leaders={tournamentState.matchDays >= 3 ? tournamentState.leaders.slice(0, 4).map(([name]) => name) : []}
+              friendly={isFriendlyMode(selectedTournament)}
+              leaders={leaderRuleApplied ? separatedLeaders : []}
             />
-            <div className="prematch-facts-action">
+            {persistsCompetitiveData(selectedTournament) && <div className="prematch-facts-action">
               <button
                 type="button"
                 onClick={() => setFacts(prematchFacts(
@@ -504,13 +558,15 @@ export function TeamBuilder({
                   funnyFactRules,
                   globalGames,
                   selectedTournament,
+                  separatedLeaders,
+                  selectedTournamentEdition?.standings ?? [],
                 ))}
               >
                 <Flame /> Datos para la previa
               </button>
               <span>Se calculan localmente con el historial de {competition}.</span>
-            </div>
-            {facts && (
+            </div>}
+            {persistsCompetitiveData(selectedTournament) && facts && (
               <section className="prematch-facts">
                 <header>
                   <span>Sin IA · datos del historial</span>
@@ -518,7 +574,7 @@ export function TeamBuilder({
                 </header>
                 {facts.length ? facts.map((fact) => (
                   <article key={fact.code}>
-                    <strong>{fact.title} <small>{fact.scope === 'global' ? 'Historial global' : competition}</small></strong>
+                    <strong>{fact.title}{fact.scope === 'global' && <> <small>Historial global</small></>}</strong>
                     <p>{fact.text}</p>
                   </article>
                 )) : (
@@ -649,7 +705,7 @@ function TeamPitch({
   );
 }
 
-function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; tournament: string; leaders: string[] }) {
+function BalanceExplanation({ teams, tournament, leaders, friendly }: { teams: TeamPair; tournament: string; leaders: string[]; friendly: boolean }) {
   const a = teams.formationA.counts,
     b = teams.formationB.counts,
     valid = teams.formationA.valid && teams.formationB.valid,
@@ -685,7 +741,9 @@ function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; t
           : 'Las líneas se distribuyeron proporcionalmente.';
   return (
     <div className="balance-explanation">
-      <div><strong>Partido del torneo</strong><span>Esta propuesta corresponde a <b>{tournament || 'la edición actual'}</b>. La pelea por la tabla y los líderes se evalúan dentro de esa edición.</span></div>
+      {friendly && (
+        <div><strong>Partido amistoso</strong><span>Este armado busca únicamente equipos parejos. No genera estadísticas ni datos para la previa.</span></div>
+      )}
       <div>
         <strong>
           {valid ? 'Formaciones válidas' : 'Convocatoria limitada'}
@@ -709,24 +767,14 @@ function BalanceExplanation({ teams, tournament, leaders }: { teams: TeamPair; t
       </div>}
       <div>
         <strong>Momento de los jugadores</strong>
-        <span>
-          {strongA.length || strongB.length
-            ? `Los jugadores que llegan en mejor momento también fueron distribuidos entre los equipos: ${[strongA.length ? `${strongA.map((player) => player.name).join(', ')} en Celeste` : '', strongB.length ? `${strongB.map((player) => player.name).join(', ')} en Rosa` : ''].filter(Boolean).join('; ')}.`
-            : 'No hay grandes diferencias de momento reciente, por lo que pesaron más el nivel y las posiciones.'}{' '}
-          {quietA.length || quietB.length
-            ? 'Quienes están recuperando ritmo quedaron acompañados por compañeros de momento más estable.'
-            : ''}
-        </span>
+        <span>{playerMomentExplanation(strongA, strongB, quietA, quietB)}</span>
       </div>
       <div>
-        <strong>Química y flexibilidad</strong>
+        <strong>Química</strong>
         <span>
           {notablePairsA.length || notablePairsB.length
-            ? `${chemistryNotes.join(' ')} Las duplas positivas y negativas sólo se usan para afinar el equilibrio: no impiden que todos jueguen con todos y nunca pesan más que el nivel o la formación.`
-            : 'No había duplas con suficiente historial como para alterar la propuesta.'}{' '}
-          Se recurrió a{' '}
-          {teams.formationA.alternateUses + teams.formationB.alternateUses}{' '}
-          posiciones alternativas para completar las líneas.
+            ? chemistryNotes.join(' ')
+            : 'No había duplas con suficiente historial como para alterar la propuesta.'}
         </span>
       </div>
       {leaders.length >= 2 && teams.a.some((player) => leaders.includes(player.name)) && teams.b.some((player) => leaders.includes(player.name)) && (

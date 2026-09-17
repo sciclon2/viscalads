@@ -4,7 +4,7 @@ import sqlite3
 import unittest
 from datetime import date
 
-from sciclon2.services.ratings import player_ratings
+from sciclon2.services.ratings import player_rating_history, player_ratings
 
 
 class RatingTests(unittest.TestCase):
@@ -15,24 +15,30 @@ class RatingTests(unittest.TestCase):
             CREATE TABLE players (id INTEGER PRIMARY KEY);
             CREATE TABLE player_rating_ranges (player_id INTEGER PRIMARY KEY, min_rating REAL, max_rating REAL);
             CREATE TABLE competitions (id INTEGER PRIMARY KEY, slug TEXT);
-            CREATE TABLE tournaments (id INTEGER PRIMARY KEY, competition_id INTEGER);
-            CREATE TABLE matches (id INTEGER PRIMARY KEY, played_on TEXT, outcome TEXT, coverage_status TEXT, tournament_id INTEGER);
+            CREATE TABLE tournaments (id INTEGER PRIMARY KEY, competition_id INTEGER, code TEXT);
+            CREATE TABLE matches (id INTEGER PRIMARY KEY, played_on TEXT, outcome TEXT, coverage_status TEXT, tournament_id INTEGER, score_team1 INTEGER, score_team2 INTEGER, voided_at TEXT);
             CREATE TABLE match_players (match_id INTEGER, player_id INTEGER, team_no INTEGER);
             INSERT INTO players VALUES (1);
             INSERT INTO player_rating_ranges VALUES (1, 4.0, 6.5);
             INSERT INTO competitions VALUES (1, 'sarria'), (2, 'bogatell');
-            INSERT INTO tournaments VALUES (1, 1), (2, 2);
+            INSERT INTO tournaments VALUES (1, 1, 'T1'), (2, 2, 'B1');
         """)
 
     def tearDown(self):
         self.connection.close()
 
     def add(self, match_id: int, played_on: str, outcome: str, team_no: int = 1):
-        self.connection.execute("INSERT INTO matches VALUES (?, ?, ?, 'verified', 1)", (match_id, played_on, outcome))
+        self.connection.execute(
+            "INSERT INTO matches(id, played_on, outcome, coverage_status, tournament_id) VALUES (?, ?, ?, 'verified', 1)",
+            (match_id, played_on, outcome),
+        )
         self.connection.execute("INSERT INTO match_players VALUES (?, 1, ?)", (match_id, team_no))
 
     def add_absence(self, match_id: int, played_on: str):
-        self.connection.execute("INSERT INTO matches VALUES (?, ?, '1', 'verified', 1)", (match_id, played_on))
+        self.connection.execute(
+            "INSERT INTO matches(id, played_on, outcome, coverage_status, tournament_id) VALUES (?, ?, '1', 'verified', 1)",
+            (match_id, played_on),
+        )
 
     def test_fewer_than_five_recent_matches_use_midpoint(self):
         for index in range(4):
@@ -49,19 +55,25 @@ class RatingTests(unittest.TestCase):
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
 
-    def test_old_matches_are_excluded(self):
+    def test_matches_older_than_ninety_five_days_are_excluded(self):
         for index in range(5):
             self.add(index + 1, f"2026-05-{20 + index:02d}", "1")
         rating = player_ratings(self.connection, date(2026, 9, 6))[1]
         self.assertEqual(0, rating["recentMatches"])
         self.assertEqual(5.25, rating["current"])
 
-    def test_matches_between_sixty_and_ninety_days_are_included(self):
+    def test_matches_inside_ninety_five_days_are_included(self):
         for index in range(5):
             self.add(index + 1, f"2026-06-{10 + index:02d}", "1")
         rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
+
+    def test_ninety_five_day_boundary_is_inclusive_and_day_ninety_six_is_excluded(self):
+        self.add(1, "2026-06-03", "1")  # 95 days before the reference date.
+        self.add(2, "2026-06-02", "1")  # 96 days before the reference date.
+        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
+        self.assertEqual(1, rating["recentMatches"])
 
     def test_three_consecutive_absences_reduce_form_by_ten_percentage_points(self):
         for index in range(5):
@@ -118,6 +130,31 @@ class RatingTests(unittest.TestCase):
         bogatell = player_ratings(self.connection, date(2026, 9, 6), "bogatell")[1]
         self.assertGreater(sarria["current"], sarria["midpoint"])
         self.assertLess(bogatell["current"], bogatell["midpoint"])
+
+    def test_history_recalculates_each_matchday_without_future_results(self):
+        for index in range(5):
+            self.add(index + 1, f"2026-08-{10 + index:02d}", "1")
+        history = player_rating_history(self.connection, "sarria")[1]
+        self.assertEqual(5, len(history))
+        self.assertEqual(5.25, history[0]["current"])
+        self.assertEqual(6.12, history[-1]["current"])
+        self.assertEqual("W", history[-1]["result"])
+        self.assertTrue(history[-1]["participated"])
+
+    def test_history_includes_absent_matchdays_after_first_appearance(self):
+        self.add(1, "2026-08-10", "1")
+        self.add_absence(2, "2026-08-17")
+        history = player_rating_history(self.connection, "sarria")[1]
+        self.assertEqual(2, len(history))
+        self.assertFalse(history[-1]["participated"])
+        self.assertIsNone(history[-1]["result"])
+        self.assertEqual(1, history[-1]["missedMatches"])
+
+    def test_history_does_not_draw_a_player_before_their_debut(self):
+        self.add_absence(1, "2026-08-03")
+        self.add(2, "2026-08-10", "1")
+        history = player_rating_history(self.connection, "sarria")[1]
+        self.assertEqual(["2026-08-10"], [point["date"] for point in history])
 
 
 if __name__ == "__main__":

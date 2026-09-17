@@ -162,6 +162,13 @@ def save_match(connection: sqlite3.Connection, payload: dict, match_id: int | No
     outcome = "D" if scores[0] == scores[1] else ("1" if scores[0] > scores[1] else "2")
 
     with connection:
+        duplicate = connection.execute(
+            "SELECT id FROM matches WHERE played_on=? AND tournament_id=? AND id<>COALESCE(?, -1)",
+            (played_on, tournament_id, match_id),
+        ).fetchone()
+        if duplicate:
+            raise ValueError("Este partido ya fue guardado para esa fecha y torneo")
+
         if match_id is None:
             cursor = connection.execute(
                 "INSERT INTO matches(played_on, tournament_id, score_team1, score_team2, outcome, "

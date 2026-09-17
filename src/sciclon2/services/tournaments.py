@@ -39,7 +39,7 @@ def list_tournaments(connection: sqlite3.Connection, competition: str) -> list[d
 
 def calculated_tournament_champions(connection: sqlite3.Connection, tournament_id: int) -> list[str]:
     """Return every points leader; the historical table is only an audit reference."""
-    table = tournament_standings(connection, tournament_id)
+    table = [item for item in tournament_standings(connection, tournament_id) if item["played"] > 0]
     if not table:
         return []
     winning_points = max(item["totalPoints"] for item in table)
@@ -122,7 +122,38 @@ def tournament_standings(connection: sqlite3.Connection, tournament_id: int) -> 
         "AND outcome IN ('1','2','D') ORDER BY played_on, id",
         (tournament_id,),
     ).fetchall()
-    rows: dict[int, dict] = {}
+    tournament = connection.execute(
+        "SELECT competition_id, ends_on FROM tournaments WHERE id=?", (tournament_id,)
+    ).fetchone()
+    eligible_players = []
+    if tournament and tournament["ends_on"] >= date.today().isoformat():
+        latest_match = connection.execute(
+            "SELECT MAX(m.played_on) FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+            "WHERE t.competition_id=? AND m.voided_at IS NULL AND m.coverage_status='verified'",
+            (tournament["competition_id"],),
+        ).fetchone()[0]
+        if latest_match:
+            cutoff = (date.fromisoformat(latest_match) - timedelta(days=90)).isoformat()
+            eligible_players = connection.execute(
+                "SELECT DISTINCT p.id player_id, p.canonical_name FROM competition_players cp "
+                "JOIN players p ON p.id=cp.player_id "
+                "JOIN match_players mp ON mp.player_id=p.id "
+                "JOIN matches m ON m.id=mp.match_id "
+                "JOIN tournaments mt ON mt.id=m.tournament_id "
+                "WHERE cp.competition_id=? AND cp.active=1 AND mt.competition_id=cp.competition_id "
+                "AND m.voided_at IS NULL AND m.coverage_status='verified' AND m.played_on>=? "
+                "ORDER BY p.canonical_name COLLATE NOCASE",
+                (tournament["competition_id"], cutoff),
+            ).fetchall()
+    rows: dict[int, dict] = {
+        player["player_id"]: {
+            "playerId": player["player_id"], "name": player["canonical_name"],
+            "played": 0, "wins": 0, "draws": 0, "losses": 0,
+            "goals": 0, "bonusMatches": 0, "positivePoints": 0,
+            "penalizedMatches": 0, "negativePoints": 0,
+        }
+        for player in eligible_players
+    }
     for match in matches:
         players = connection.execute(
             "SELECT mp.player_id, mp.team_no, p.canonical_name FROM match_players mp "
@@ -178,4 +209,7 @@ def tournament_standings(connection: sqlite3.Connection, tournament_id: int) -> 
         item["basePoints"] = item["wins"] * 3 + item["draws"]
         item["totalPoints"] = item["basePoints"] + item["positivePoints"] + item["negativePoints"]
         result.append(item)
-    return sorted(result, key=lambda item: (-item["totalPoints"], -item["wins"], item["played"], item["name"].lower()))
+    return sorted(result, key=lambda item: (
+        -item["totalPoints"], -item["wins"], item["played"] == 0,
+        item["played"], item["name"].lower(),
+    ))

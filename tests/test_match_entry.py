@@ -100,6 +100,15 @@ class MatchEntryWorkflowTests(unittest.TestCase):
             save_match(self.connection, payload)
         self.assertEqual(before, self.connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0])
 
+    def test_duplicate_match_has_a_friendly_error_and_is_not_saved_twice(self):
+        save_match(self.connection, self.payload())
+        before = self.connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+
+        with self.assertRaisesRegex(ValueError, "ya fue guardado"):
+            save_match(self.connection, self.payload())
+
+        self.assertEqual(before, self.connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0])
+
     def test_scorer_must_belong_to_the_indicated_team(self):
         payload = self.payload()
         payload["goals"] = [{"teamNo": 2, "playerId": self.players[0], "count": 1}]

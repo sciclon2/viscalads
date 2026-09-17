@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, timedelta
 
-RATING_WINDOW_DAYS = 90
+RATING_WINDOW_DAYS = 95
 MIN_MATCHES = 5
 MAX_MATCHES = 10
 NEUTRAL_SCORE = 0.5
@@ -108,3 +108,53 @@ def player_ratings(
             "absencePenaltyPercent": int(ABSENCE_PENALTY * 100) if absence_penalty else 0,
         }
     return ratings
+
+
+def player_rating_history(connection: sqlite3.Connection, competition: str) -> dict[int, list[dict]]:
+    """Rebuild each player's rating on every verified matchday without future data."""
+    matchdays = connection.execute(
+        "SELECT m.id, m.played_on, m.outcome, m.score_team1, m.score_team2, t.code tournament "
+        "FROM matches m JOIN tournaments t ON t.id=m.tournament_id "
+        "JOIN competitions c ON c.id=t.competition_id "
+        "WHERE c.slug=? AND m.voided_at IS NULL AND m.coverage_status='verified' "
+        "AND m.outcome IN ('1','2','D') ORDER BY m.played_on, m.id",
+        (competition,),
+    ).fetchall()
+    history: dict[int, list[dict]] = {int(row[0]): [] for row in connection.execute(
+        "SELECT player_id FROM player_rating_ranges"
+    )}
+    seen_players: set[int] = set()
+    for match in matchdays:
+        ratings = player_ratings(connection, date.fromisoformat(match["played_on"]), competition)
+        participants = {
+            int(row["player_id"]): int(row["team_no"])
+            for row in connection.execute(
+                "SELECT player_id, team_no FROM match_players WHERE match_id=?",
+                (match["id"],),
+            )
+        }
+        seen_players.update(participants)
+        for player_id, rating in ratings.items():
+            if player_id not in seen_players:
+                continue
+            team_no = participants.get(player_id)
+            result = None
+            if team_no is not None:
+                result = "D" if match["outcome"] == "D" else (
+                    "W" if match["outcome"] == str(team_no) else "L"
+                )
+            history[player_id].append({
+                "date": match["played_on"],
+                "tournament": match["tournament"],
+                "current": rating["current"],
+                "formScore": rating["formScore"],
+                "recentMatches": rating["recentMatches"],
+                "dynamic": rating["dynamic"],
+                "missedMatches": rating["missedMatches"],
+                "absencePenalty": rating["absencePenalty"],
+                "participated": team_no is not None,
+                "result": result,
+                "score1": match["score_team1"],
+                "score2": match["score_team2"],
+            })
+    return history
