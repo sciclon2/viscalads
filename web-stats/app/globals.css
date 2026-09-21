@@ -1133,6 +1133,26 @@
   background: #fff;
   padding: 13px;
 }
+.rating-history-open {
+  overflow: hidden;
+}
+.rating-history-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  border: 0;
+  background: rgba(8, 25, 17, 0.62);
+  backdrop-filter: blur(3px);
+}
+.player-rating-history.is-expanded {
+  position: fixed;
+  inset: 4vh 4vw;
+  z-index: 9999;
+  overflow: auto;
+  padding: 22px;
+  border-color: #8fb59d;
+  box-shadow: 0 24px 80px rgba(4, 24, 14, 0.35);
+}
 .player-rating-history header,
 .player-rating-history footer {
   display: flex;
@@ -1160,6 +1180,42 @@
   color: #173d2a;
   font-size: 0.7rem;
   font-weight: 800;
+}
+.rating-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.rating-history-expand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 96px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #96ad9d;
+  border-radius: 8px;
+  background: #173d2a;
+  padding: 0 11px;
+  color: white;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.rating-history-expand span {
+  display: inline;
+  white-space: nowrap;
+}
+.rating-history-expand:hover {
+  background: #24613f;
+}
+.rating-history-expand svg {
+  width: 17px;
+  min-width: 0;
+  height: 17px;
 }
 .rating-history-scale {
   display: inline-flex;
@@ -1189,23 +1245,36 @@
   overflow-x: auto;
   margin-top: 8px;
 }
-.player-rating-history svg {
+.player-rating-chart-scroll > svg {
   display: block;
   width: 100%;
   min-width: 590px;
 }
-.player-rating-history svg text {
+.player-rating-history.is-expanded .player-rating-chart-scroll > svg {
+  min-width: 900px;
+  max-height: 68vh;
+}
+.player-rating-chart-scroll > svg text {
   fill: #6a7b70;
   font-size: 10px;
   font-weight: 700;
 }
+.player-rating-chart-scroll > svg .rating-history-x-label {
+  fill: #294b38;
+  font-size: 8px;
+  font-weight: 850;
+}
+.player-rating-chart-scroll > svg .rating-history-x-label tspan + tspan {
+  fill: #75877b;
+  font-size: 7px;
+}
 .rating-history-band {
-  fill: #e9f4df;
-  opacity: 0.7;
+  fill: #e1f3e6;
+  opacity: 0.85;
 }
 .rating-history-grid {
-  stroke: #dfe7e1;
-  stroke-width: 1;
+  stroke: #b9c9be;
+  stroke-width: 1.2;
 }
 .rating-history-tournament {
   stroke: #aab9ae;
@@ -1214,10 +1283,11 @@
 }
 .rating-history-line {
   fill: none;
-  stroke: #173d2a;
-  stroke-width: 3;
+  stroke: #08783f;
+  stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(4, 75, 38, 0.22));
 }
 .player-rating-history footer {
   justify-content: flex-start;

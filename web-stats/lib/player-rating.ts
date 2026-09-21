@@ -2,6 +2,7 @@ export type RatingRange = {
   min: number;
   max: number;
   current: number;
+  stale?: boolean;
 };
 
 export function ratingRangePosition(rating: RatingRange | null | undefined) {
@@ -13,9 +14,9 @@ export function ratingRangePosition(rating: RatingRange | null | undefined) {
 }
 
 export function isPrimeMoment(rating: RatingRange | null | undefined) {
-  return Boolean(rating) && ratingRangePosition(rating) >= 0.8;
+  return Boolean(rating) && !rating?.stale && ratingRangePosition(rating) >= 0.8;
 }
 
 export function isRockBottom(rating: RatingRange | null | undefined) {
-  return Boolean(rating) && ratingRangePosition(rating) <= 0.2;
+  return Boolean(rating) && !rating?.stale && ratingRangePosition(rating) <= 0.2;
 }

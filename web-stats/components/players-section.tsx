@@ -11,6 +11,7 @@ import { PlayerRatingHistory } from '@/components/player-rating-history';
 import type { CompetitionStats, Game, PlayerStat, Profile } from '@/lib/stats-context';
 import { ratingRangePosition } from '@/lib/player-rating';
 import { activityCutoff, hasRecentActivity } from '@/lib/player-activity';
+import { isTournamentClosedOn } from '@/lib/tournament-dates';
 import {
   countries,
   countryFlag,
@@ -156,24 +157,30 @@ export function PlayersSection({
     : undefined;
   const recentGames = useMemo(() => {
     if (!selected) return [];
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - 95);
-    const cutoffDate = cutoff.toISOString().slice(0, 10);
+    if (selected.rating?.stale) return [];
     const today = new Date().toISOString().slice(0, 10);
-    return games
+    const played = games
       .filter(
         (game) =>
           game.status === 'verified' &&
-          game.date >= cutoffDate &&
           game.date <= today &&
           (game.team1.includes(selected.name) ||
             game.team2.includes(selected.name)),
       )
       .sort(
         (a, b) => b.date.localeCompare(a.date) || Number(b.id) - Number(a.id),
-      )
-      .slice(0, 10);
+      );
+    const session: Game[] = [];
+    for (const game of played) {
+      const newer = session.at(-1);
+      if (newer) {
+        const gap = (Date.parse(`${newer.date}T00:00:00Z`) - Date.parse(`${game.date}T00:00:00Z`)) / 86400000;
+        if (gap > 95) break;
+      }
+      session.push(game);
+      if (session.length === 10) break;
+    }
+    return session;
   }, [games, selected]);
   const open = (player: Profile) => {
     setSelected(player);
@@ -421,8 +428,9 @@ function PlayerDetails({
 }) {
   const r = player.rating,
     flag = countryFlag(player.nationality),
+    today = new Date().toISOString().slice(0, 10),
     titles = tournaments.filter((tournament) =>
-      tournament.champions.includes(player.name),
+      isTournamentClosedOn(tournament.endsOn, today) && tournament.champions.includes(player.name),
     );
   return (
     <div className="player-detail-grid">
@@ -493,9 +501,11 @@ function PlayerDetails({
         <ShieldCheck />
         <span>
           {r
-            ? r.dynamic
-              ? `${r.recentMatches} partidos válidos en los últimos ${r.windowDays} días.`
-              : `Nivel medio: menos de 5 partidos en ${r.windowDays} días.`
+            ? r.stale
+              ? `Momento sin vigencia: no juega desde el ${r.lastPlayedOn ?? 'último registro'} (más de ${r.inactivityDays} días).`
+              : r.dynamic
+              ? `${r.recentMatches} de sus últimos 10 partidos usados para el nivel.`
+              : 'Nivel medio: todavía no alcanzó 5 partidos jugados.'
             : 'Definí un rango para activar el cálculo dinámico.'}
         </span>
       </div>
@@ -550,7 +560,7 @@ function RecentRatingMatches({
       <summary className="player-recent-heading">
         <span>
           <strong>Partidos usados para el nivel</strong>
-          <small>{games.length}/10 · últimos 95 días</small>
+          <small>{games.length}/10 · últimos partidos jugados</small>
         </span>
         <ChevronDown aria-hidden="true" />
       </summary>

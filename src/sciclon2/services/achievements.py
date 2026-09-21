@@ -142,7 +142,8 @@ def player_achievements(connection: sqlite3.Connection, competition: str) -> dic
     unbeaten_titles: dict[int, list[tuple[str, str, str]]] = defaultdict(list)
     for tournament in connection.execute(
         "SELECT t.id,t.code,t.starts_on,t.ends_on FROM tournaments t JOIN competitions c ON c.id=t.competition_id "
-        "WHERE c.slug=? ORDER BY t.ends_on,t.id", (competition,),
+        "WHERE c.slug=? AND t.ends_on<? ORDER BY t.ends_on,t.id",
+        (competition, date.today().isoformat()),
     ):
         for name in calculated_tournament_champions(connection, tournament["id"]):
             player = connection.execute("SELECT id FROM players WHERE canonical_name=?", (name,)).fetchone()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 import unittest
 
-from sciclon2.services.rotation import consecutive_appearances
+from sciclon2.services.rotation import consecutive_appearances, rotation_threshold
 
 
 class RotationTests(unittest.TestCase):
@@ -48,6 +48,15 @@ class RotationTests(unittest.TestCase):
         self.add_match(2, '2026-01-02', 3, [2])
         self.assertEqual({1: 1}, consecutive_appearances(self.connection, 'sarria'))
         self.assertEqual({2: 1}, consecutive_appearances(self.connection, 'bogatell'))
+
+    def test_second_matchday_uses_one_appearance_threshold(self):
+        self.add_match(1, '2026-01-15', 2, [1, 2])
+        self.assertEqual(1, rotation_threshold(self.connection, 'sarria'))
+
+    def test_third_matchday_restores_two_appearance_threshold(self):
+        self.add_match(1, '2026-01-15', 2, [1, 2])
+        self.add_match(2, '2026-01-22', 2, [1])
+        self.assertEqual(2, rotation_threshold(self.connection, 'sarria'))
 
 
 if __name__ == '__main__':

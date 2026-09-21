@@ -55,6 +55,19 @@ class TournamentTests(unittest.TestCase):
         self.assertIsNotNone(latest)
         self.assertEqual('2026-09-02', latest['ends_on'])
 
+    def test_open_tournament_exposes_leaders_but_not_champions(self):
+        open_tournament = self.connection.execute(
+            "SELECT id FROM tournaments WHERE code='SARRIA-11' AND ends_on>=?",
+            (date.today().isoformat(),),
+        ).fetchone()
+        self.assertIsNotNone(open_tournament)
+        self.assertTrue(calculated_tournament_champions(self.connection, open_tournament["id"]))
+        listed = next(
+            item for item in list_tournaments(self.connection, "sarria")
+            if item["id"] == open_tournament["id"]
+        )
+        self.assertEqual([], listed["champions"])
+
     def test_visible_champion_does_not_depend_on_historical_snapshot(self):
         tournament_id = 2
         expected = calculated_tournament_champions(self.connection, tournament_id)

@@ -19,7 +19,10 @@ def list_tournaments(connection: sqlite3.Connection, competition: str) -> list[d
     ).fetchall()
     result = []
     for row in rows:
-        champions = calculated_tournament_champions(connection, row["id"])
+        # A live table has leaders, not champions. Exposing those leaders here
+        # made first-matchday winners look like tournament winners elsewhere.
+        closed = bool(row["ends_on"] and row["ends_on"] < date.today().isoformat())
+        champions = calculated_tournament_champions(connection, row["id"]) if closed else []
         rules = [dict(item) for item in connection.execute(
             "SELECT rule_code AS code, threshold_value AS threshold, "
             "points_delta AS pointsDelta, description FROM tournament_rules "

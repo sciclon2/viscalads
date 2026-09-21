@@ -162,6 +162,29 @@ class WhatsAppLineupTests(unittest.TestCase):
         self.assertEqual('rotated_in', by_player['Sergio Pérez']['status'])
         self.assertEqual('Sergio Pérez', by_player['Facu']['replacedByPlayer'])
 
+    def test_matchday_two_rotates_opening_day_players_for_zero_appearance_reserves(self):
+        self.add_recent_matches([[1, 2]])
+        with patch('sciclon2.services.whatsapp_lineup.random.SystemRandom.shuffle',
+                   side_effect=lambda values: None):
+            result = parse_whatsapp_lineup(
+                self.connection, 'sarria',
+                'FINAL 2\n1. Facu IN\n2. Sergio IN\nSuplentes\n3. Sergio Pérez IN',
+            )
+        by_player = {item['player']: item for item in result['items']}
+        self.assertEqual(1, result['rotationThreshold'])
+        self.assertEqual(1, result['rotationChanges'])
+        self.assertEqual('rotated_in', by_player['Sergio Pérez']['status'])
+        self.assertIn('excepción de la fecha 2', by_player['Sergio Pérez']['rotationReason'])
+
+    def test_matchday_three_returns_to_the_normal_two_match_threshold(self):
+        self.add_recent_matches([[1], [2]])
+        result = parse_whatsapp_lineup(
+            self.connection, 'sarria',
+            'FINAL 2\n1. Facu IN\n2. Sergio IN\nSuplentes\n3. Sergio Pérez IN',
+        )
+        self.assertEqual(2, result['rotationThreshold'])
+        self.assertEqual(0, result['rotationChanges'])
+
     def test_rotation_removes_longest_streak_before_shorter_eligible_streaks(self):
         self.add_recent_matches([[1, 2], [1, 2], [1]])
         result = parse_whatsapp_lineup(

@@ -55,25 +55,41 @@ class RatingTests(unittest.TestCase):
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
 
-    def test_matches_older_than_ninety_five_days_are_excluded(self):
-        for index in range(5):
-            self.add(index + 1, f"2026-05-{20 + index:02d}", "1")
-        rating = player_ratings(self.connection, date(2026, 9, 6))[1]
-        self.assertEqual(0, rating["recentMatches"])
-        self.assertEqual(5.25, rating["current"])
-
-    def test_matches_inside_ninety_five_days_are_included(self):
-        for index in range(5):
-            self.add(index + 1, f"2026-06-{10 + index:02d}", "1")
-        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
+    def test_matches_older_than_ninety_five_days_remain_when_playing_is_continuous(self):
+        for index, played_on in enumerate(("2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01")):
+            self.add(index + 1, played_on, "1")
+        rating = player_ratings(self.connection, date(2026, 6, 20))[1]
         self.assertEqual(5, rating["recentMatches"])
         self.assertTrue(rating["dynamic"])
+        self.assertEqual(6.12, rating["current"])
 
-    def test_ninety_five_day_boundary_is_inclusive_and_day_ninety_six_is_excluded(self):
-        self.add(1, "2026-06-03", "1")  # 95 days before the reference date.
-        self.add(2, "2026-06-02", "1")  # 96 days before the reference date.
-        rating = player_ratings(self.connection, date(2026, 9, 6), "sarria")[1]
-        self.assertEqual(1, rating["recentMatches"])
+    def test_rating_stays_stable_until_inactivity_limit(self):
+        for index in range(5):
+            self.add(index + 1, f"2025-05-{20 + index:02d}", "1")
+        original = player_ratings(self.connection, date(2025, 6, 1), "sarria")[1]
+        ninety_five_days_later = player_ratings(self.connection, date(2025, 8, 27), "sarria")[1]
+        self.assertEqual(original["current"], ninety_five_days_later["current"])
+        self.assertFalse(ninety_five_days_later["stale"])
+
+    def test_rating_becomes_stale_after_more_than_ninety_five_days_without_playing(self):
+        for index in range(5):
+            self.add(index + 1, f"2025-05-{20 + index:02d}", "1")
+        stale = player_ratings(self.connection, date(2025, 8, 28), "sarria")[1]
+        self.assertTrue(stale["stale"])
+        self.assertFalse(stale["dynamic"])
+        self.assertEqual(5, stale["recentMatches"])
+        self.assertEqual(6.12, stale["current"])
+        self.assertEqual(stale["midpoint"], stale["matchmakingCurrent"])
+
+    def test_return_after_long_gap_starts_a_new_spell(self):
+        for index in range(5):
+            self.add(index + 1, f"2025-05-{20 + index:02d}", "1")
+        self.add(6, "2026-01-10", "1")
+        returned = player_ratings(self.connection, date(2026, 1, 10), "sarria")[1]
+        self.assertFalse(returned["stale"])
+        self.assertFalse(returned["dynamic"])
+        self.assertEqual(1, returned["recentMatches"])
+        self.assertEqual(returned["midpoint"], returned["current"])
 
     def test_three_consecutive_absences_reduce_form_by_ten_percentage_points(self):
         for index in range(5):
@@ -104,6 +120,15 @@ class RatingTests(unittest.TestCase):
         rating = player_ratings(self.connection, date(2026, 9, 6))[1]
         self.assertEqual(6.5, rating["current"])
         self.assertEqual(10, rating["recentMatches"])
+
+    def test_a_new_win_never_lowers_the_rating(self):
+        outcomes = ["1", "1", "2", "1", "1", "1", "2", "1", "1", "1"]
+        for index, outcome in enumerate(outcomes):
+            self.add(index + 1, f"2026-08-{index + 1:02d}", outcome)
+        before = player_ratings(self.connection, date(2026, 8, 10), "sarria")[1]
+        self.add(11, "2026-08-11", "1")
+        after = player_ratings(self.connection, date(2026, 8, 11), "sarria")[1]
+        self.assertGreaterEqual(after["formScore"], before["formScore"])
 
     def test_opponent_strength_does_not_change_match_weight(self):
         self.connection.execute("INSERT INTO players VALUES (2)")
