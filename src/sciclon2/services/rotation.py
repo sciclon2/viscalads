@@ -3,6 +3,28 @@ from __future__ import annotations
 import sqlite3
 
 
+def rotation_threshold(connection: sqlite3.Connection, competition: str) -> int:
+    """Return the appearances needed to yield a place in the current tournament.
+
+    Before matchday two, one appearance is enough so the opening-day reserves
+    receive a fair opportunity. From matchday three onward the normal threshold
+    of two consecutive appearances applies.
+    """
+    tournament = connection.execute(
+        "SELECT t.id FROM tournaments t JOIN competitions c ON c.id=t.competition_id "
+        "WHERE c.slug=? ORDER BY COALESCE(t.starts_on, '') DESC, t.id DESC LIMIT 1",
+        (competition,),
+    ).fetchone()
+    if not tournament:
+        return 2
+    played = connection.execute(
+        "SELECT COUNT(*) FROM matches WHERE tournament_id=? AND voided_at IS NULL "
+        "AND coverage_status='verified' AND outcome IN ('1','2','D')",
+        (tournament["id"],),
+    ).fetchone()[0]
+    return 1 if played == 1 else 2
+
+
 def consecutive_appearances(connection: sqlite3.Connection, competition: str) -> dict[int, int]:
     """Calculate appearance streaks in the newest tournament of a competition."""
     tournament = connection.execute(

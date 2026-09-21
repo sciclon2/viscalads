@@ -6,7 +6,7 @@ import sqlite3
 import unicodedata
 from difflib import SequenceMatcher
 
-from .rotation import consecutive_appearances
+from .rotation import consecutive_appearances, rotation_threshold
 
 
 def _key(value: str) -> str:
@@ -62,11 +62,12 @@ def _declared_capacity(text: str) -> tuple[int | None, bool]:
     return (int(players.group(1)), False) if players else (None, False)
 
 
-def _apply_rotation(items: list[dict], streaks: dict[int, int]) -> list[dict]:
+def _apply_rotation(items: list[dict], streaks: dict[int, int], threshold: int = 2) -> list[dict]:
     """Swap eligible reserves into a full list using the competition rotation rule.
 
-    Reserves enter in source-list order. A reserve with fewer than two consecutive
-    appearances may replace a confirmed player with two or more. The longest streak
+    Reserves enter in source-list order. On matchday two, a reserve with no
+    appearances may replace an opening-day player. From matchday three onward,
+    the normal threshold is two consecutive appearances. The longest streak
     leaves first; an exact tie within the same streak is decided randomly.
     """
     entrants = [
@@ -74,13 +75,13 @@ def _apply_rotation(items: list[dict], streaks: dict[int, int]) -> list[dict]:
         if item["status"] == "reserve"
         and _is_confirmed(item["raw"])
         and item["playerId"] is not None
-        and streaks.get(int(item["playerId"]), 0) < 2
+        and streaks.get(int(item["playerId"]), 0) < threshold
     ]
     outgoing = [
         item for item in items
         if item["accepted"]
         and item["playerId"] is not None
-        and streaks.get(int(item["playerId"]), 0) >= 2
+        and streaks.get(int(item["playerId"]), 0) >= threshold
     ]
     by_streak: dict[int, list[dict]] = {}
     for item in outgoing:
@@ -106,6 +107,8 @@ def _apply_rotation(items: list[dict], streaks: dict[int, int]) -> list[dict]:
             f'y llevar {entrant["consecutiveAppearances"]} partidos consecutivos. '
             f'{leaving["player"]} cede el lugar después de '
             f'{streaks.get(int(leaving["playerId"]), 0)} partidos consecutivos.'
+            + (' Se aplica la excepción de la fecha 2 para repartir la oportunidad de jugar.'
+               if threshold == 1 else '')
             + (' Como había jugadores empatados con esa misma racha, la salida se decidió por sorteo.'
                if entrant["tieBreakRandom"] else '')
         )
@@ -224,7 +227,8 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
                       "playerId": None, "player": None, "candidates": candidates,
                       "accepted": accepted, "confirmed": confirmed, "slot": slot, "guestCount": guest_count})
     streaks = consecutive_appearances(connection, competition)
-    _apply_rotation(items, streaks)
+    threshold = rotation_threshold(connection, competition)
+    _apply_rotation(items, streaks, threshold)
     for item in items:
         if item["playerId"] is not None:
             item.setdefault("consecutiveAppearances", streaks.get(int(item["playerId"]), 0))
@@ -237,5 +241,6 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
         "acceptedCount": accepted_count,
         "waitingCount": sum(item["status"] == "reserve" and _is_confirmed(item["raw"]) for item in items),
         "rotationChanges": sum(item["status"] == "rotated_in" for item in items),
+        "rotationThreshold": threshold,
         "complete": capacity is not None and accepted_count == capacity,
     }

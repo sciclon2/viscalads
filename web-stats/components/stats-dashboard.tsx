@@ -1175,8 +1175,8 @@ function FormResults({ rows }: { rows: FormRow[] }) {
         </div>
       )}
       <p className="border-t border-[#173d2a]/10 px-4 py-3 text-sm text-muted-foreground">
-        La secuencia empieza por el último partido. Se usan hasta 10 partidos de
-        los últimos 95 días. Con menos de 5, el nivel queda neutral; entre 5 y
+        La secuencia empieza por el último partido. Se usan los últimos 10 partidos
+        jugados. Con menos de 5, el nivel queda neutral; entre 5 y
         9, los partidos faltantes valen 0,5. Alto: 60% o más · neutral: 40% a
         59,9% · bajo: menos de 40%.
       </p>
@@ -1194,23 +1194,33 @@ function formRows(
   );
   const referenceDate = new Date();
   referenceDate.setHours(0, 0, 0, 0);
-  const cutoff = new Date(referenceDate);
-  cutoff.setDate(cutoff.getDate() - 95);
   const today = referenceDate.toISOString().slice(0, 10);
-  const cutoffDate = cutoff.toISOString().slice(0, 10);
   const allValid = [...games]
     .filter((g) => g.status === 'verified')
     .sort((a, b) => a.date.localeCompare(b.date));
-  const recentValid = allValid.filter(
-    (g) => g.date >= cutoffDate && g.date <= today,
-  );
+  const recentValid = allValid.filter((g) => g.date <= today);
   return playerNames.flatMap((name) => {
     const fullHistory = allValid.filter(
       (g) => g.team1.includes(name) || g.team2.includes(name),
     );
-    const currentGames = recentValid
+    const playedDescending = recentValid
       .filter((g) => g.team1.includes(name) || g.team2.includes(name))
-      .slice(-10);
+      .reverse();
+    const currentSession: Game[] = [];
+    const latestGap = playedDescending[0]
+      ? (referenceDate.getTime() - Date.parse(`${playedDescending[0].date}T00:00:00Z`)) / 86400000
+      : Infinity;
+    if (latestGap > 95) return [];
+    for (const game of playedDescending) {
+      const newer = currentSession.at(-1);
+      if (newer) {
+        const gap = (Date.parse(`${newer.date}T00:00:00Z`) - Date.parse(`${game.date}T00:00:00Z`)) / 86400000;
+        if (gap > 95) break;
+      }
+      currentSession.push(game);
+      if (currentSession.length === 10) break;
+    }
+    const currentGames = currentSession.reverse();
     if (!currentGames.length) return [];
     const summarize = (games: Game[]) => {
       const row: RecordRow = {

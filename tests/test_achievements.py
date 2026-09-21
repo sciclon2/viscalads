@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date
 
 from sciclon2.config import DEFAULT_DB
 from sciclon2.db import connect
@@ -82,7 +83,8 @@ class AchievementTests(unittest.TestCase):
             title_count = sum(
                 player_name in calculated_tournament_champions(self.connection, tournament[0])
                 for tournament in self.connection.execute(
-                    "SELECT t.id FROM tournaments t JOIN competitions c ON c.id=t.competition_id WHERE c.slug='sarria'"
+                    "SELECT t.id FROM tournaments t JOIN competitions c ON c.id=t.competition_id "
+                    "WHERE c.slug='sarria' AND t.ends_on<?", (date.today().isoformat(),)
                 )
             )
             if not champion:
@@ -103,7 +105,8 @@ class AchievementTests(unittest.TestCase):
             ).fetchone()[0]
             undefeated_titles = 0
             for tournament in self.connection.execute(
-                "SELECT t.id FROM tournaments t JOIN competitions c ON c.id=t.competition_id WHERE c.slug='sarria'"
+                "SELECT t.id FROM tournaments t JOIN competitions c ON c.id=t.competition_id "
+                "WHERE c.slug='sarria' AND t.ends_on<?", (date.today().isoformat(),)
             ):
                 if player_name not in calculated_tournament_champions(self.connection, tournament["id"]):
                     continue
@@ -116,6 +119,19 @@ class AchievementTests(unittest.TestCase):
                 if rows and all(row["outcome"] == "D" or row["outcome"] == str(row["team_no"]) for row in rows):
                     undefeated_titles += 1
             self.assertEqual(undefeated_titles, patch["progress"])
+
+    def test_open_tournaments_never_generate_champion_patches(self):
+        open_codes = {
+            row[0] for row in self.connection.execute(
+                "SELECT t.code FROM tournaments t JOIN competitions c ON c.id=t.competition_id "
+                "WHERE c.slug='sarria' AND t.ends_on>=?", (date.today().isoformat(),)
+            )
+        }
+        self.assertTrue(open_codes)
+        for patches in self.achievements.values():
+            for patch in patches:
+                if patch["code"] in {"champion", "unbeaten_champion"}:
+                    self.assertFalse(any(code in patch["description"] for code in open_codes))
 
     def test_competition_histories_never_mix(self):
         sarria = player_achievements(self.connection, "sarria")

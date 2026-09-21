@@ -3,13 +3,32 @@ from __future__ import annotations
 import sqlite3
 from datetime import date, timedelta
 
-RATING_WINDOW_DAYS = 95
+INACTIVITY_DAYS = 95
 MIN_MATCHES = 5
 MAX_MATCHES = 10
 NEUTRAL_SCORE = 0.5
 FORM_CONTRAST = 1.4
 ABSENCE_THRESHOLD = 3
 ABSENCE_PENALTY = 0.1
+
+
+def _session_results(rows: list[sqlite3.Row], reference: date) -> tuple[list[sqlite3.Row], bool]:
+    """Return the latest continuous playing spell, capped at ten appearances."""
+    if not rows:
+        return [], False
+    latest = date.fromisoformat(rows[0]["played_on"])
+    stale = reference - latest > timedelta(days=INACTIVITY_DAYS)
+    session = [rows[0]]
+    newer = latest
+    for result in rows[1:]:
+        older = date.fromisoformat(result["played_on"])
+        if newer - older > timedelta(days=INACTIVITY_DAYS):
+            break
+        session.append(result)
+        newer = older
+        if len(session) == MAX_MATCHES:
+            break
+    return session, stale
 
 
 def player_ratings(
@@ -19,7 +38,6 @@ def player_ratings(
 ) -> dict[int, dict]:
     """Calculate one position-independent rating, optionally scoped to one competition."""
     reference = as_of or date.today()
-    cutoff = reference - timedelta(days=RATING_WINDOW_DAYS)
     ranges = connection.execute(
         "SELECT player_id, min_rating, max_rating FROM player_rating_ranges"
     ).fetchall()
@@ -53,21 +71,21 @@ def player_ratings(
         minimum = float(row["min_rating"])
         maximum = float(row["max_rating"])
         midpoint = (minimum + maximum) / 2
-        parameters = [player_id, cutoff.isoformat(), reference.isoformat()]
+        parameters = [player_id, reference.isoformat()]
         if competition:
             parameters.append(competition)
-        parameters.append(MAX_MATCHES)
-        results = connection.execute(
+        all_results = connection.execute(
             "SELECT m.played_on, m.outcome, mp.team_no "
             "FROM match_players mp JOIN matches m ON m.id=mp.match_id "
             "JOIN tournaments t ON t.id=m.tournament_id "
             "JOIN competitions c ON c.id=t.competition_id "
             "WHERE mp.player_id=? AND m.coverage_status='verified' "
-            "AND m.outcome IN ('1','2','D') AND m.played_on BETWEEN ? AND ? "
+            "AND m.outcome IN ('1','2','D') AND m.played_on<=? "
             + competition_clause +
-            "ORDER BY m.played_on DESC, m.id DESC LIMIT ?",
+            "ORDER BY m.played_on DESC, m.id DESC",
             parameters,
         ).fetchall()
+        results, stale = _session_results(all_results, reference)
         played = len(results)
         if played < MIN_MATCHES:
             score = NEUTRAL_SCORE
@@ -84,13 +102,13 @@ def player_ratings(
             raw_score = earned / MAX_MATCHES
             score = max(0.0, min(1.0, NEUTRAL_SCORE + (raw_score - NEUTRAL_SCORE) * FORM_CONTRAST))
             rating = minimum + (maximum - minimum) * score
-            active = True
+            active = not stale
         missed_matches = 0
         for match_id in match_ids:
             if player_id in participants[match_id]:
                 break
             missed_matches += 1
-        absence_penalty = missed_matches >= ABSENCE_THRESHOLD
+        absence_penalty = not stale and missed_matches >= ABSENCE_THRESHOLD
         if absence_penalty:
             score = max(0.0, score - ABSENCE_PENALTY)
             rating = minimum + (maximum - minimum) * score
@@ -98,11 +116,14 @@ def player_ratings(
             "min": minimum,
             "max": maximum,
             "current": round(rating, 2),
+            "matchmakingCurrent": round(midpoint if stale else rating, 2),
             "midpoint": round(midpoint, 2),
             "recentMatches": played,
             "formScore": round(score, 3),
             "dynamic": active,
-            "windowDays": RATING_WINDOW_DAYS,
+            "stale": stale,
+            "inactivityDays": INACTIVITY_DAYS,
+            "lastPlayedOn": all_results[0]["played_on"] if all_results else None,
             "missedMatches": missed_matches,
             "absencePenalty": absence_penalty,
             "absencePenaltyPercent": int(ABSENCE_PENALTY * 100) if absence_penalty else 0,
@@ -150,6 +171,7 @@ def player_rating_history(connection: sqlite3.Connection, competition: str) -> d
                 "formScore": rating["formScore"],
                 "recentMatches": rating["recentMatches"],
                 "dynamic": rating["dynamic"],
+                "stale": rating["stale"],
                 "missedMatches": rating["missedMatches"],
                 "absencePenalty": rating["absencePenalty"],
                 "participated": team_no is not None,

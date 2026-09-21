@@ -55,7 +55,7 @@ type ParsedLine = {
   tieBreakRandom?: boolean;
   rotationReason?: string;
 };
-type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; rotationChanges: number; complete: boolean };
+type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; rotationChanges: number; rotationThreshold: number; complete: boolean };
 
 export function TeamBuilder({
   games,
@@ -93,7 +93,7 @@ export function TeamBuilder({
           );
           return {
             ...profile,
-            level: profile.rating?.current ?? 5,
+            level: profile.rating?.matchmakingCurrent ?? profile.rating?.current ?? 5,
             played: history.length,
             lastDate: history.at(-1)?.date ?? '—',
           };
@@ -227,7 +227,7 @@ export function TeamBuilder({
       });
       const body = await response.json() as Partial<ParsedList> & { error?: string };
       if (!response.ok) throw new Error(body.error || 'No se pudo interpretar la lista');
-      setParsedList({ items: body.items ?? [], capacity: body.capacity ?? null, acceptedCount: body.acceptedCount ?? 0, waitingCount: body.waitingCount ?? 0, rotationChanges: body.rotationChanges ?? 0, complete: body.complete ?? false });
+      setParsedList({ items: body.items ?? [], capacity: body.capacity ?? null, acceptedCount: body.acceptedCount ?? 0, waitingCount: body.waitingCount ?? 0, rotationChanges: body.rotationChanges ?? 0, rotationThreshold: body.rotationThreshold ?? 2, complete: body.complete ?? false });
       if (body.capacity) setCapacityAnswer('');
       setResolutions({});
     } catch (error) {
@@ -340,6 +340,7 @@ export function TeamBuilder({
                   <strong>{parsedList.capacity ? `${parsedList.acceptedCount}/${parsedList.capacity} lugares confirmados` : `${parsedList.acceptedCount} confirmados · cupo no detectado`}</strong>
                   <span className="ml-2 text-muted-foreground">{parsedList.waitingCount ? `· ${parsedList.waitingCount} esperando como suplente` : ''}</span>
                   {parsedList.capacity && !parsedList.complete && <small className="mt-1 block text-[#a05722]">La convocatoria todavía no completa el cupo detectado.</small>}
+                  {parsedList.rotationThreshold === 1 && <small className="mt-1 block font-bold text-[#805014]">Fecha 2: quien jugó la inauguración puede ceder su lugar a un suplente con IN que todavía no jugó.</small>}
                   {parsedList.rotationChanges > 0 && <small className="mt-1 block font-bold text-[#347a52]">Se aplicaron {parsedList.rotationChanges} cambio{parsedList.rotationChanges === 1 ? '' : 's'} por rotación.</small>}
                 </div>
                 {parsedList.capacity === null && (
@@ -422,9 +423,11 @@ export function TeamBuilder({
               </span>
               <b
                 title={
-                  player.rating?.dynamic
-                    ? `${player.rating.recentMatches} partidos válidos en ${player.rating.windowDays} días`
-                    : `Nivel base: menos de 5 partidos en ${player.rating?.windowDays ?? 95} días`
+                  player.rating?.stale
+                    ? `Momento sin vigencia: más de ${player.rating.inactivityDays} días sin jugar`
+                    : player.rating?.dynamic
+                    ? `${player.rating.recentMatches} de sus últimos 10 partidos usados para el nivel`
+                    : 'Nivel base: todavía no alcanzó 5 partidos jugados'
                 }
               >
                 {player.level.toFixed(2)}

@@ -6,11 +6,14 @@ export type PlayerRating = {
   min: number;
   max: number;
   current: number;
+  matchmakingCurrent: number;
   midpoint: number;
   recentMatches: number;
   formScore: number;
   dynamic: boolean;
-  windowDays: number;
+  stale: boolean;
+  inactivityDays: number;
+  lastPlayedOn: string | null;
   missedMatches: number;
   absencePenalty: boolean;
   absencePenaltyPercent: number;
@@ -22,6 +25,7 @@ export type PlayerRatingPoint = {
   formScore: number;
   recentMatches: number;
   dynamic: boolean;
+  stale: boolean;
   missedMatches: number;
   absencePenalty: boolean;
   participated: boolean;
