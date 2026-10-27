@@ -4,7 +4,7 @@ Viscalads is a local-first football history, statistics and balanced-team projec
 
 The repository is private by design. Original WhatsApp exports, private media and OCR scratch files must never be committed. Curated competition and player images used by the interface live under `web-stats/public/` and may be versioned deliberately.
 
-Current tagged release: `v1.4.0`. It adds own-goal entry, richer moment-based prematch facts, WhatsApp list parsing and copy-ready output, cumulative tournament rules, progressively stronger leader separation in the team builder, and the latest verified Sarrià history. The current branch also contains the tournament-code matching fix used by leader detection.
+Current release: `v1.4.1`. It includes the tournament-code matching fix used by leader detection, refreshed installation and tournament-operation guides, and all features introduced in `v1.4.0`: own-goal entry, richer moment-based prematch facts, WhatsApp list parsing and copy-ready output, cumulative tournament rules, progressively stronger leader separation in the team builder, and the latest verified Sarrià history.
 
 ## Architecture
 
