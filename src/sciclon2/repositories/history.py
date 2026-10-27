@@ -30,7 +30,7 @@ def matches(connection: sqlite3.Connection) -> list[dict]:
         ).fetchall()
         game["guests"] = [dict(guest) for guest in guests]
         game["goals"] = [dict(goal) for goal in connection.execute(
-            "SELECT mg.team_no, mg.goal_count, p.canonical_name AS player_name, "
+            "SELECT mg.team_no, mg.goal_count, mg.goal_type, p.canonical_name AS player_name, "
             "g.guest_label FROM match_goals mg "
             "LEFT JOIN players p ON p.id=mg.player_id "
             "LEFT JOIN match_guests g ON g.id=mg.guest_id "

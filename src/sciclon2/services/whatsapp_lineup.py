@@ -28,12 +28,17 @@ def _name_from_line(line: str) -> str:
     value = re.sub(r"^[>\s]+", "", value)
     value = re.sub(r"^\s*[-*•✅☑️✔️]+\s*", "", value)
     value = re.sub(r"^\d+(?:\ufe0f?\u20e3)?\s*[.)°º:\-]?\s*", "", value)
-    value = re.sub(r"^\s*(?:\[?\s*in\s*\]?|\(?\s*in\s*\)?)\s*[-–—:|]*\s*", "", value, flags=re.I)
+    value = re.sub(r"^\s*(?:\[?\s*i\s*n\s*\]?|\(?\s*i\s*n\s*\)?)\s*[-–—:|]*\s*", "", value, flags=re.I)
     value = re.sub(r"^@", "", value)
     previous = None
     while previous != value:
         previous = value
-        value = re.sub(r"\s*(?:[-–—,:|]+\s*)?(?:\(?\s*in\s*\)?|\[\s*in\s*\]|confirmad[oa]|✅|☑️|✔️|⚽|🔥)\s*$", "", value, flags=re.I)
+        value = re.sub(
+            r"(?:\s+|[-–—,:|]+\s*)(?:\(?\s*i\s*n\s*\)?|\[\s*i\s*n\s*\]|confirmad[oa]|✅|☑️|✔️|⚽|🔥)\s*$",
+            "",
+            value,
+            flags=re.I,
+        )
     return value.strip(" *_~`-–—:.,")
 
 
@@ -43,7 +48,7 @@ def _slot_number(line: str) -> int | None:
 
 
 def _is_confirmed(line: str) -> bool:
-    return bool(re.search(r"(?:^|[\s*_[\]()]|[-–—:|])in(?:$|[\s*_[\]()]|[-–—:|])", line, re.I) or
+    return bool(re.search(r"(?:^|[\s*_[\]()]|[-–—:|])i\s*n(?:$|[\s*_[\]()]|[-–—:|])", line, re.I) or
                 re.search(r"✅|☑️|✔️|confirmad[oa]", line, re.I))
 
 
@@ -95,6 +100,7 @@ def _apply_rotation(items: list[dict], streaks: dict[int, int], threshold: int =
             rng.shuffle(group)
             randomly_tied_ids.update(int(item["playerId"]) for item in group)
         outgoing.extend(group)
+    displaced: list[dict] = []
     for entrant, leaving in zip(entrants, outgoing):
         entrant["accepted"] = True
         entrant["status"] = "rotated_in"
@@ -119,7 +125,88 @@ def _apply_rotation(items: list[dict], streaks: dict[int, int], threshold: int =
         leaving["replacedByPlayer"] = entrant["player"]
         leaving["tieBreakRandom"] = entrant["tieBreakRandom"]
         leaving["rotationReason"] = entrant["rotationReason"]
+        displaced.append(leaving)
+    waiting_groups: dict[int, list[dict]] = {}
+    for item in displaced:
+        waiting_groups.setdefault(item["consecutiveAppearances"], []).append(item)
+    waiting_order = 0
+    for streak in sorted(waiting_groups):
+        group = waiting_groups[streak]
+        if len(group) > 1:
+            rng.shuffle(group)
+        for item in group:
+            item["waitingOrder"] = waiting_order
+            waiting_order += 1
     return items
+
+
+def _fill_open_slots(items: list[dict], capacity: int | None, streaks: dict[int, int]) -> int:
+    """Promote confirmed reserves into vacant places before applying rotation."""
+    if capacity is None:
+        return 0
+    accepted_count = sum((1 + item["guestCount"]) for item in items if item["accepted"])
+    open_slots = max(0, capacity - accepted_count)
+    filled = 0
+    for item in items:
+        if open_slots <= 0:
+            break
+        places = 1 + item["guestCount"]
+        if (
+            item["status"] == "reserve"
+            and item.get("confirmed")
+            and item["playerId"] is not None
+            and places <= open_slots
+        ):
+            item["accepted"] = True
+            item["status"] = "promoted_in"
+            item["consecutiveAppearances"] = streaks.get(int(item["playerId"]), 0)
+            item["promotionReason"] = (
+                f'{item["player"]} entra por estar primero entre los suplentes con IN '
+                "y haber un lugar libre en la convocatoria."
+            )
+            open_slots -= places
+            filled += places
+    return filled
+
+
+def _whatsapp_list(items: list[dict], capacity: int | None) -> str:
+    if capacity is None:
+        return ""
+    entrants = {item.get("replacesPlayerId"): item for item in items if item["status"] == "rotated_in"}
+    starters: list[str] = []
+    for item in items:
+        if item.get("originalReserve"):
+            continue
+        if item["status"] == "rotated_out":
+            replacement = entrants.get(item.get("playerId"))
+            if replacement and replacement.get("player"):
+                starters.append(f'{replacement["player"]} IN')
+        elif item.get("accepted") and item.get("player"):
+            starters.append(f'{item["player"]} IN')
+    starters.extend(
+        f'{item["player"]} IN'
+        for item in items
+        if item["status"] == "promoted_in" and item.get("player")
+    )
+
+    original_reserves = [
+        item for item in items
+        if item.get("originalReserve") and item["status"] not in {"rotated_in", "promoted_in"}
+    ]
+    displaced = sorted(
+        (item for item in items if item["status"] == "rotated_out"),
+        key=lambda item: item.get("waitingOrder", 10_000),
+    )
+
+    def label(item: dict) -> str:
+        name = item.get("player") or item.get("value") or item.get("raw") or "Jugador"
+        return f'{name}{" IN" if item.get("confirmed") else ""}'
+
+    reserves = [label(item) for item in original_reserves] + [label(item) for item in displaced]
+    lines = ["Titulares", *(f"{index}. {name}" for index, name in enumerate(starters, 1))]
+    if reserves:
+        lines.extend(["", "Suplentes", *(f"{index}. {name}" for index, name in enumerate(reserves, 1))])
+    return "\n".join(lines)
 
 
 def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text: str) -> dict:
@@ -188,18 +275,21 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
             continue
         if key in ignored_words or key.startswith(("lista ", "equipo ", "partido ", "miercoles ", "sabado ", "convocatoria ", "nuevo torneo", "amistoso ", "septiembre ")):
             continue
+        if re.match(r"^(?:primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo) partido\b", key):
+            continue
         if key in {"reina elizenda", "reina elisenda", "sarria", "bogatell", "barceloneta"}:
             continue
         if re.fullmatch(r"(?:cerrad[ao]|completa|completo|hora|lugar|fecha)(?:\s+.*)?", key):
             continue
+        outside_capacity = reserve_section or (capacity is not None and slot is not None and slot > capacity)
         explicitly_out = bool(re.search(r"(?:^|\s)(?:out|baja|no voy|no juega)(?:\s|$)", key))
         if explicitly_out:
             cleaned = re.sub(r"(?:^|\s)(?:out|baja|no voy|no juega)(?:\s|$)", " ", key).strip()
             items.append({"raw": raw.strip(), "value": cleaned or value, "status": "excluded",
                           "playerId": None, "player": None, "candidates": [],
-                          "accepted": False, "confirmed": False, "slot": slot, "guestCount": guest_count})
+                          "accepted": False, "confirmed": False, "slot": slot, "guestCount": guest_count,
+                          "originalReserve": outside_capacity})
             continue
-        outside_capacity = reserve_section or (capacity is not None and slot is not None and slot > capacity)
         accepted = not outside_capacity and confirmed
         exact = sorted(lookup.get(key, set()))
         if len(exact) == 1:
@@ -210,7 +300,7 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
             items.append({"raw": raw.strip(), "value": value, "status": status,
                           "playerId": player_id, "player": by_id[player_id], "candidates": [],
                           "accepted": accepted and status != "duplicate", "confirmed": confirmed, "slot": slot,
-                          "guestCount": guest_count})
+                          "guestCount": guest_count, "originalReserve": outside_capacity})
             continue
         scores: dict[int, float] = {}
         for candidate_key, player_ids in lookup.items():
@@ -225,10 +315,14 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
         status = "reserve" if outside_capacity else ("ambiguous" if candidates else "unknown")
         items.append({"raw": raw.strip(), "value": value, "status": status,
                       "playerId": None, "player": None, "candidates": candidates,
-                      "accepted": accepted, "confirmed": confirmed, "slot": slot, "guestCount": guest_count})
+                      "accepted": accepted, "confirmed": confirmed, "slot": slot, "guestCount": guest_count,
+                      "originalReserve": outside_capacity})
     streaks = consecutive_appearances(connection, competition)
     threshold = rotation_threshold(connection, competition)
-    _apply_rotation(items, streaks, threshold)
+    filled_vacancies = _fill_open_slots(items, capacity, streaks)
+    accepted_before_rotation = sum((1 + item["guestCount"]) for item in items if item["accepted"])
+    if capacity is not None and accepted_before_rotation == capacity:
+        _apply_rotation(items, streaks, threshold)
     for item in items:
         if item["playerId"] is not None:
             item.setdefault("consecutiveAppearances", streaks.get(int(item["playerId"]), 0))
@@ -239,8 +333,15 @@ def parse_whatsapp_lineup(connection: sqlite3.Connection, competition: str, text
         "needsReview": sum(item["status"] in {"ambiguous", "unknown", "duplicate"} for item in items),
         "capacity": capacity,
         "acceptedCount": accepted_count,
-        "waitingCount": sum(item["status"] == "reserve" and _is_confirmed(item["raw"]) for item in items),
+        "waitingCount": sum(
+            item["status"] in {"reserve", "rotated_out"}
+            and item.get("confirmed")
+            and item["playerId"] is not None
+            for item in items
+        ),
+        "filledVacancies": filled_vacancies,
         "rotationChanges": sum(item["status"] == "rotated_in" for item in items),
         "rotationThreshold": threshold,
         "complete": capacity is not None and accepted_count == capacity,
+        "whatsappText": _whatsapp_list(items, capacity),
     }

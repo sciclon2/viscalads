@@ -1,7 +1,50 @@
-import type { Game, PlayerStat } from '@/lib/stats-context';
+import type { Game, PlayerRatingPoint, PlayerStat, Profile } from '@/lib/stats-context';
 
 export type FactRule = { code: string; title: string; description: string; priority: number; scope?: 'competition' | 'global' };
 export type PrematchFact = { code: string; title: string; text: string; scope: 'competition' | 'global' };
+type MomentProfile = Pick<Profile, 'name' | 'rating' | 'ratingHistory'>;
+
+type MomentStatus = 'prime' | 'rock' | 'normal';
+const momentStatus = (score: number, dynamic = true): MomentStatus =>
+  dynamic && score >= 0.8 ? 'prime' : dynamic && score <= 0.2 ? 'rock' : 'normal';
+
+function projectedFormScore(games: Game[], name: string, nextResult: 'W' | 'L') {
+  const appearances = games
+    .filter((game) => game.status === 'verified' && inTeam(game, name) && game.outcome !== '?')
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const recent: Game[] = [];
+  for (const game of appearances) {
+    if (recent.length && Date.parse(`${recent.at(-1)!.date}T00:00:00Z`) - Date.parse(`${game.date}T00:00:00Z`) > 95 * 86400000) break;
+    recent.push(game);
+    if (recent.length === 9) break;
+  }
+  const results = recent.map((game) => resultFor(game, name));
+  results.unshift(nextResult);
+  if (results.length < 5) return 0.5;
+  const earned = results.reduce((sum, result) => sum + (result === 'W' ? 1 : result === 'D' ? 0.5 : 0), 0)
+    + (10 - results.length) * 0.5;
+  return Math.max(0, Math.min(1, 0.5 + (earned / 10 - 0.5) * 1.4));
+}
+
+function statusRuns(points: PlayerRatingPoint[], status: Exclude<MomentStatus, 'normal'>) {
+  const appearances = points.filter((point) => point.participated);
+  const runs: Array<{ count: number; from: string; to: string }> = [];
+  let current: { count: number; from: string; to: string } | null = null;
+  appearances.forEach((point) => {
+    if (momentStatus(point.formScore, point.dynamic) === status) {
+      current ??= { count: 0, from: point.date, to: point.date };
+      current.count++;
+      current.to = point.date;
+    } else if (current) {
+      runs.push(current);
+      current = null;
+    }
+  });
+  if (current) runs.push(current);
+  const active = runs.at(-1)?.to === appearances.at(-1)?.date ? runs.at(-1)! : null;
+  const previousBest = Math.max(0, ...runs.filter((run) => run !== active).map((run) => run.count));
+  return { active, previousBest };
+}
 
 const inTeam = (game: Game, name: string) => game.team1.includes(name) ? 1 : game.team2.includes(name) ? 2 : 0;
 const resultFor = (game: Game, name: string) => {
@@ -38,6 +81,7 @@ export function prematchFacts(
   selectedTournament?: string,
   separatedLeaders: string[] = [],
   tournamentStandings: Array<{ name: string; totalPoints: number }> = [],
+  profiles: MomentProfile[] = [],
 ): PrematchFact[] {
   const enabled = new Set(rules.map((rule) => rule.code));
   const title = (code: string) => rules.find((rule) => rule.code === code)?.title ?? code;
@@ -45,6 +89,47 @@ export function prematchFacts(
   const verified = globalGames.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
   const competitionGames = games.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
   const currentTournament = selectedTournament || [...competitionGames].reverse().find((game) => game.tournament)?.tournament;
+
+  if (enabled.has('moment_status_watch') && profiles.length) {
+    const proposed = new Set([...teamA, ...teamB]);
+    const possibilities = profiles.filter((profile) => proposed.has(profile.name) && profile.rating?.dynamic).flatMap((profile) => {
+      const current = momentStatus(profile.rating!.formScore, profile.rating!.dynamic);
+      const win = momentStatus(projectedFormScore(competitionGames, profile.name, 'W'));
+      const loss = momentStatus(projectedFormScore(competitionGames, profile.name, 'L'));
+      if (current === 'normal' && win === 'prime') return [{ weight: 1, text: `Una victoria puede coronar a ${profile.name} y llevarlo a Prime Moment.` }];
+      if (current === 'prime' && loss !== 'prime') return [{ weight: 2, text: `La corona de ${profile.name} está en juego: una derrota puede sacarlo de Prime Moment.` }];
+      if (current === 'normal' && loss === 'rock') return [{ weight: 3, text: `${profile.name} está al borde del pozo: una derrota puede enviarlo a Rock Bottom.` }];
+      if (current === 'rock' && win !== 'rock') return [{ weight: 4, text: `${profile.name} juega para escapar del pozo: una victoria puede quitarle la calavera.` }];
+      return [];
+    }).sort((a, b) => a.weight - b.weight);
+    if (possibilities.length) facts.push({
+      code: 'moment_status_watch', title: title('moment_status_watch'), scope: 'competition',
+      text: possibilities.slice(0, 2).map((item) => item.text).join(' '),
+    });
+  }
+
+  if (enabled.has('moment_status_record') && profiles.length) {
+    const proposed = new Set([...teamA, ...teamB]);
+    const candidates = profiles.filter((profile) => proposed.has(profile.name)).flatMap((profile) =>
+      (['prime', 'rock'] as const).flatMap((status) => {
+        const { active, previousBest } = statusRuns(profile.ratingHistory ?? [], status);
+        return active && active.count >= 2 ? [{ profile, status, active, previousBest }] : [];
+      })
+    ).sort((a, b) => (b.active.count - b.previousBest) - (a.active.count - a.previousBest) || b.active.count - a.active.count);
+    const candidate = candidates[0];
+    if (candidate) {
+      const label = candidate.status === 'prime' ? 'Prime Moment' : 'Rock Bottom';
+      const action = candidate.active.count > candidate.previousBest
+        ? `estableció un nuevo récord personal: lleva ${candidate.active.count} partidos consecutivos en ${label}`
+        : candidate.active.count === candidate.previousBest
+          ? `igualó su récord personal de ${candidate.active.count} partidos consecutivos en ${label}`
+          : `lleva ${candidate.active.count} partidos consecutivos en ${label}`;
+      facts.push({
+        code: 'moment_status_record', title: title('moment_status_record'), scope: 'competition',
+        text: `${candidate.profile.name} ${action}, desde el ${new Date(`${candidate.active.from}T00:00:00`).toLocaleDateString('es-ES')}.`,
+      });
+    }
+  }
 
   if (currentTournament) {
     const tournamentGames = competitionGames.filter((game) => game.tournament === currentTournament);

@@ -153,11 +153,22 @@ def save_match(connection: sqlite3.Connection, payload: dict, match_id: int | No
     for goal in goals:
         team_no = int(goal.get("teamNo", 0))
         count = int(goal.get("count", 0))
+        goal_type = str(goal.get("goalType", "regular"))
         if team_no not in (1, 2) or count < 1:
             raise ValueError("Los goles no son válidos")
+        if goal_type not in {"regular", "own_goal"}:
+            raise ValueError("El tipo de gol no es válido")
         scorer = str(goal.get("playerId") or goal.get("guestName", "")).strip()
-        if scorer and (team_no, scorer) not in roster:
-            raise ValueError("El goleador no pertenece al equipo indicado")
+        scorer_team = team_no if goal_type == "regular" else 3 - team_no
+        if goal_type == "own_goal" and not scorer:
+            raise ValueError("El gol en contra necesita un autor")
+        if scorer and (scorer_team, scorer) not in roster:
+            message = (
+                "El autor del gol en contra debe pertenecer al equipo rival"
+                if goal_type == "own_goal"
+                else "El goleador no pertenece al equipo indicado"
+            )
+            raise ValueError(message)
         scores[team_no - 1] += count
     outcome = "D" if scores[0] == scores[1] else ("1" if scores[0] > scores[1] else "2")
 
@@ -219,9 +230,11 @@ def save_match(connection: sqlite3.Connection, payload: dict, match_id: int | No
             if not player_id and not guest_name:
                 continue
             connection.execute(
-                "INSERT INTO match_goals(match_id, team_no, player_id, guest_id, goal_count) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO match_goals(match_id, team_no, player_id, guest_id, goal_count, goal_type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (match_id, int(goal["teamNo"]), int(player_id) if player_id else None,
-                 guest_ids.get(guest_name), int(goal["count"])),
+                 guest_ids.get(guest_name), int(goal["count"]),
+                 str(goal.get("goalType", "regular"))),
             )
         connection.execute(
             "INSERT INTO evidence(match_id, evidence_type, excerpt, confidence) VALUES (?, 'manual', ?, 'confirmed')",

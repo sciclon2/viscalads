@@ -7,6 +7,7 @@ from pathlib import Path
 from sciclon2.config import DEFAULT_DB
 from sciclon2.db import connect
 from sciclon2.services.match_entry import recent_lineups, save_lineup, save_match, void_match
+from sciclon2.services.tournaments import tournament_standings
 
 
 class MatchEntryWorkflowTests(unittest.TestCase):
@@ -73,6 +74,44 @@ class MatchEntryWorkflowTests(unittest.TestCase):
             "SELECT score_team1, score_team2 FROM matches WHERE id=?", (match_id,)
         ).fetchone()
         self.assertEqual((0, 3), tuple(score))
+
+    def test_own_goal_counts_for_opponent_but_not_as_a_personal_goal(self):
+        payload = self.payload()
+        payload["goals"] = [{
+            "teamNo": 2,
+            "playerId": self.players[0],
+            "goalType": "own_goal",
+            "count": 1,
+        }]
+        match_id = save_match(self.connection, payload)
+        goal = self.connection.execute(
+            "SELECT team_no, player_id, goal_count, goal_type FROM match_goals WHERE match_id=?",
+            (match_id,),
+        ).fetchone()
+        self.assertEqual((2, self.players[0], 1, "own_goal"), tuple(goal))
+        score = self.connection.execute(
+            "SELECT score_team1, score_team2, outcome FROM matches WHERE id=?", (match_id,)
+        ).fetchone()
+        self.assertEqual((0, 1, "2"), tuple(score))
+        tournament_id = self.connection.execute(
+            "SELECT tournament_id FROM matches WHERE id=?", (match_id,)
+        ).fetchone()[0]
+        player = next(
+            item for item in tournament_standings(self.connection, tournament_id)
+            if item["playerId"] == self.players[0]
+        )
+        self.assertEqual(0, player["goals"])
+
+    def test_own_goal_author_must_belong_to_opposing_team(self):
+        payload = self.payload()
+        payload["goals"] = [{
+            "teamNo": 2,
+            "playerId": self.players[2],
+            "goalType": "own_goal",
+            "count": 1,
+        }]
+        with self.assertRaisesRegex(ValueError, "equipo rival"):
+            save_match(self.connection, payload)
 
     def test_update_replaces_old_rosters_and_recalculates_the_result(self):
         match_id = save_match(self.connection, self.payload())

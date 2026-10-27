@@ -201,7 +201,8 @@ def tournament_standings(connection: sqlite3.Connection, tournament_id: int) -> 
     goals = connection.execute(
         "SELECT mg.player_id, SUM(mg.goal_count) goals FROM match_goals mg "
         "JOIN matches m ON m.id=mg.match_id WHERE m.tournament_id=? "
-        "AND m.voided_at IS NULL AND mg.player_id IS NOT NULL GROUP BY mg.player_id",
+        "AND m.voided_at IS NULL AND mg.player_id IS NOT NULL "
+        "AND mg.goal_type='regular' GROUP BY mg.player_id",
         (tournament_id,),
     ).fetchall()
     for goal in goals:
@@ -214,5 +215,5 @@ def tournament_standings(connection: sqlite3.Connection, tournament_id: int) -> 
         result.append(item)
     return sorted(result, key=lambda item: (
         -item["totalPoints"], -item["wins"], item["played"] == 0,
-        item["played"], item["name"].lower(),
+        item["played"], -item["goals"], item["name"].lower(),
     ))

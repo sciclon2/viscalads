@@ -97,11 +97,18 @@ export function MatchEntry({
   }, [competition, mode]);
   const key = (team: number, member: Member) =>
     `${team}:${member.playerId ?? `g:${member.guestName}`}`;
+  const ownGoalKey = (beneficiaryTeam: number, member: Member) =>
+    `${beneficiaryTeam}:own:${member.playerId ?? `g:${member.guestName}`}`;
   const score = (team: number) =>
     teams[team - 1].reduce(
       (sum, member) => sum + (goals[key(team, member)] || 0),
       0,
-    ) + (goals[`${team}:unknown`] || 0);
+    ) +
+    teams[2 - team].reduce(
+      (sum, member) => sum + (goals[ownGoalKey(team, member)] || 0),
+      0,
+    ) +
+    (goals[`${team}:unknown`] || 0);
   const used = new Set(
     teams
       .flat()
@@ -132,6 +139,7 @@ export function MatchEntry({
     setGoals((current) => {
       const copy = { ...current };
       delete copy[key(index + 1, member)];
+      delete copy[ownGoalKey(2 - index, member)];
       return copy;
     });
   };
@@ -189,6 +197,15 @@ export function MatchEntry({
         teamNo: team,
         count: goals[`${team}:unknown`] || 0,
       })),
+      ...teams.flatMap((team, index) =>
+        team.map((member) => ({
+          teamNo: 2 - index,
+          playerId: member.playerId,
+          guestName: member.guestName,
+          goalType: 'own_goal',
+          count: goals[ownGoalKey(2 - index, member)] || 0,
+        })),
+      ),
     ].filter((goal) => goal.count > 0),
   });
   const save = async () => {
@@ -236,8 +253,12 @@ export function MatchEntry({
         const member = goal.player_name
           ? profiles.find((item) => item.name === goal.player_name)
           : undefined;
-        next[`${goal.team_no}:${member?.id ?? `g:${goal.guest_label}`}`] =
-          goal.goal_count;
+        const identity = member?.id ?? `g:${goal.guest_label}`;
+        next[
+          goal.goal_type === 'own_goal'
+            ? `${goal.team_no}:own:${identity}`
+            : `${goal.team_no}:${identity}`
+        ] = goal.goal_count;
       });
     } else {
       next['1:unknown'] = game.score1 || 0;
@@ -436,11 +457,18 @@ export function MatchEntry({
           index={0}
           title="Equipo Celeste"
           team={teams[0]}
+          opposingTeam={teams[1]}
           eligible={eligible}
           used={used}
           goals={goals}
           onGoal={(member, value) =>
             setGoals((current) => ({ ...current, [key(1, member)]: value }))
+          }
+          onOwnGoal={(member, value) =>
+            setGoals((current) => ({
+              ...current,
+              [ownGoalKey(1, member)]: value,
+            }))
           }
           unknown={goals['1:unknown'] || 0}
           allowUnknown={mode === 'admin' && Boolean(goals['1:unknown'])}
@@ -455,11 +483,18 @@ export function MatchEntry({
           index={1}
           title="Equipo Rosa"
           team={teams[1]}
+          opposingTeam={teams[0]}
           eligible={eligible}
           used={used}
           goals={goals}
           onGoal={(member, value) =>
             setGoals((current) => ({ ...current, [key(2, member)]: value }))
+          }
+          onOwnGoal={(member, value) =>
+            setGoals((current) => ({
+              ...current,
+              [ownGoalKey(2, member)]: value,
+            }))
           }
           unknown={goals['2:unknown'] || 0}
           allowUnknown={mode === 'admin' && Boolean(goals['2:unknown'])}
@@ -550,7 +585,9 @@ function MatchSummary({
             {game.goals
               .map(
                 (goal) =>
-                  `${goal.player_name || goal.guest_label || 'Sin autor'} (${goal.goal_count})`,
+                  goal.goal_type === 'own_goal'
+                    ? `Gol en contra de ${goal.player_name || goal.guest_label} → ${goal.team_no === 1 ? 'Celeste' : 'Rosa'} (${goal.goal_count})`
+                    : `${goal.player_name || goal.guest_label || 'Sin autor'} (${goal.goal_count})`,
               )
               .join(' · ')}
           </p>
@@ -564,10 +601,12 @@ function TeamEditor({
   index,
   title,
   team,
+  opposingTeam,
   eligible,
   used,
   goals,
   onGoal,
+  onOwnGoal,
   unknown,
   allowUnknown,
   onUnknown,
@@ -578,10 +617,12 @@ function TeamEditor({
   index: number;
   title: string;
   team: Member[];
+  opposingTeam: Member[];
   eligible: Profile[];
   used: Set<number>;
   goals: Record<string, number>;
   onGoal: (member: Member, value: number) => void;
+  onOwnGoal: (member: Member, value: number) => void;
   unknown: number;
   allowUnknown: boolean;
   onUnknown: (value: number) => void;
@@ -647,6 +688,36 @@ function TeamEditor({
           </div>
         ))}
       </div>
+      {opposingTeam.length > 0 && (
+        <div className="own-goals-editor">
+          <strong>Goles en contra recibidos</strong>
+          <small>
+            Suman para {title}, pero no cuentan como gol personal del rival.
+          </small>
+          <div className="own-goals-grid">
+            {opposingTeam.map((member) => (
+              <label key={`own-${member.playerId ?? member.guestName}`}>
+                Autogol de {member.name}
+                <input
+                  type="number"
+                  min="0"
+                  value={
+                    goals[
+                      `${index + 1}:own:${member.playerId ?? `g:${member.guestName}`}`
+                    ] || ''
+                  }
+                  onChange={(event) =>
+                    onOwnGoal(
+                      member,
+                      Math.max(0, Number(event.target.value)),
+                    )
+                  }
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       {allowUnknown && (
         <label className="unknown-goals">
           <Plus /> Goles históricos sin identificar

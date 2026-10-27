@@ -656,15 +656,15 @@ function RatingRange({
           }}
         />
       </div>
-      <div className="rating-range-labels">
-        <span>{rating.min.toFixed(1)}</span>
-        {!compact && (
+      {!compact && (
+        <div className="rating-range-labels">
+          <span>{rating.min.toFixed(1)}</span>
           <b>
             {rating.current.toFixed(2)} · {label}
           </b>
-        )}
-        <span>{rating.max.toFixed(1)}</span>
-      </div>
+          <span>{rating.max.toFixed(1)}</span>
+        </div>
+      )}
     </div>
   );
 }

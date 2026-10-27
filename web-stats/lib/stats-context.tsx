@@ -90,6 +90,7 @@ export type Game = {
   goals?: {
     team_no: number;
     goal_count: number;
+    goal_type: 'regular' | 'own_goal';
     player_name: string | null;
     guest_label: string | null;
   }[];

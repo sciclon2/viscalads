@@ -136,7 +136,7 @@ function keeper<T extends BalancePlayer>(team: T[], formation?: Formation) {
 export function splitBalancedTeams<T extends BalancePlayer>(
   players: T[],
   games: BalanceGame[],
-  options: { leaders?: string[] } = {},
+  options: { leaders?: string[]; leaderWeight?: number } = {},
 ): BalancedTeams<T> {
   if (players.length < 8 || players.length % 2) {
     throw new Error('Se necesita una cantidad par de al menos 8 jugadores.');
@@ -146,6 +146,7 @@ export function splitBalancedTeams<T extends BalancePlayer>(
   const totalKeepers = players.filter((player) => keeper([player])).length;
   let best: BalancedTeams<T> | null = null;
   let bestScore = Infinity;
+  let bestLeaderGap = Infinity;
 
   const evaluate = (a: T[]) => {
     const names = new Set(a.map((player) => player.name));
@@ -174,13 +175,28 @@ export function splitBalancedTeams<T extends BalancePlayer>(
       Math.abs(countsA.DEL - countsB.DEL);
     const invalidPenalty = formationA.valid && formationB.valid ? 0 : 1000;
     const leaderNames = options.leaders ?? [];
-    const leaderPenalty = leaderNames.length >= 2
+    const leaderWeight = Math.max(0, options.leaderWeight ?? 0.12);
+    const leaderGap = leaderNames.length >= 2
       ? leaderDistributionGap(
           a.map((player) => player.name),
           b.map((player) => player.name),
           leaderNames,
-        ) * 0.12
+        )
       : 0;
+    const leadersAreDecisive = leaderNames.length >= 2 && leaderWeight >= 0.6;
+    const leaderPenalty = leadersAreDecisive
+      ? 0
+      : leaderGap * leaderWeight;
+    const validFormation = formationA.valid && formationB.valid;
+    const bestHasValidFormation = Boolean(best?.formationA.valid && best?.formationB.valid);
+    if (leadersAreDecisive && validFormation && bestHasValidFormation) {
+      if (leaderGap > bestLeaderGap) return;
+      if (leaderGap < bestLeaderGap) bestScore = Infinity;
+    } else if (leadersAreDecisive && validFormation && !bestHasValidFormation) {
+      bestScore = Infinity;
+    } else if (leadersAreDecisive && !validFormation && bestHasValidFormation) {
+      return;
+    }
     const score =
       Math.abs(effectiveA - effectiveB) * 13 +
       positionGap * 0.75 +
@@ -189,6 +205,7 @@ export function splitBalancedTeams<T extends BalancePlayer>(
       invalidPenalty;
     if (score >= bestScore) return;
     bestScore = score;
+    bestLeaderGap = leaderGap;
     best = {
       a,
       b,

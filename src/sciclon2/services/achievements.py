@@ -165,7 +165,7 @@ def player_achievements(connection: sqlite3.Connection, competition: str) -> dic
     goals = {int(row["player_id"]): int(row["goals"]) for row in connection.execute(
         "SELECT mg.player_id,SUM(mg.goal_count) goals FROM match_goals mg JOIN matches m ON m.id=mg.match_id "
         "JOIN tournaments t ON t.id=m.tournament_id JOIN competitions c ON c.id=t.competition_id "
-        "WHERE c.slug=? AND mg.player_id IS NOT NULL AND m.voided_at IS NULL "
+        "WHERE c.slug=? AND mg.player_id IS NOT NULL AND mg.goal_type='regular' AND m.voided_at IS NULL "
         "AND m.coverage_status='verified' GROUP BY mg.player_id", (competition,)
     )}
     output: dict[int, list[dict]] = defaultdict(list)

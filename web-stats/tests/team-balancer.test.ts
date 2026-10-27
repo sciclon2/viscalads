@@ -181,3 +181,62 @@ test('con tres líderes deja al primero del lado con menos punteros', () => {
   const topTeam = result.a.some((item) => item.name === 'P1') ? result.a : result.b;
   assert.equal(topTeam.filter((item) => leaders.includes(item.name)).length, 1);
 });
+
+test('reparte cinco líderes con una diferencia máxima de uno', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  const leaders = ['P1', 'P2', 'P3', 'P4', 'P5'];
+  const result = splitBalancedTeams(players, [], { leaders });
+  const countA = result.a.filter((item) => leaders.includes(item.name)).length;
+  const countB = result.b.filter((item) => leaders.includes(item.name)).length;
+  assert.equal(Math.abs(countA - countB), 1);
+  const topTeamCount = result.a.some((item) => item.name === 'P1') ? countA : countB;
+  assert.equal(topTeamCount, 2);
+  const rankWeight = (team: BalancePlayer[]) => leaders.reduce(
+    (sum, name, index) => sum + (team.some((item) => item.name === name) ? leaders.length - index : 0),
+    0,
+  );
+  assert.ok(Math.abs(rankWeight(result.a) - rankWeight(result.b)) <= 1);
+});
+
+test('reparte seis líderes en partes iguales', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  const leaders = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+  const result = splitBalancedTeams(players, [], { leaders });
+  assert.equal(result.a.filter((item) => leaders.includes(item.name)).length, 3);
+  assert.equal(result.b.filter((item) => leaders.includes(item.name)).length, 3);
+  const rankWeight = (team: BalancePlayer[]) => leaders.reduce(
+    (sum, name, index) => sum + (team.some((item) => item.name === name) ? leaders.length - index : 0),
+    0,
+  );
+  assert.ok(Math.abs(rankWeight(result.a) - rankWeight(result.b)) <= 1);
+});
+
+test('reparte siete líderes y deja al primero en el grupo de tres', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  const leaders = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'];
+  const result = splitBalancedTeams(players, [], { leaders, leaderWeight: 1 });
+  const countA = result.a.filter((item) => leaders.includes(item.name)).length;
+  const countB = result.b.filter((item) => leaders.includes(item.name)).length;
+  assert.equal(Math.abs(countA - countB), 1);
+  const topTeamCount = result.a.some((item) => item.name === 'P1') ? countA : countB;
+  assert.equal(topTeamCount, 3);
+  const rankWeight = (team: BalancePlayer[]) => leaders.reduce(
+    (sum, name, index) => sum + (team.some((item) => item.name === name) ? leaders.length - index : 0),
+    0,
+  );
+  assert.equal(rankWeight(result.a), rankWeight(result.b));
+});
+
+test('cerca del final separar líderes prevalece sobre el balance de nivel', () => {
+  const players = Array.from({ length: 8 }, (_, index) => player(index + 1, 5));
+  players[0].level = 9;
+  players[1].level = 1;
+  const baseline = splitBalancedTeams(players, []);
+  const decisive = splitBalancedTeams(players, [], {
+    leaders: ['P1', 'P2'],
+    leaderWeight: 1,
+  });
+  assert.equal(baseline.a.includes(players[0]), baseline.a.includes(players[1]));
+  assert.notEqual(decisive.a.includes(players[0]), decisive.a.includes(players[1]));
+  assert.ok(decisive.difference > baseline.difference);
+});

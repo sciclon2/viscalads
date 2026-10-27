@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardPaste, Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
+import { Check, ClipboardPaste, Copy, Flame, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlayerAvatar } from '@/components/player-avatar';
@@ -25,7 +25,7 @@ import {
   isFriendlyMode,
   persistsCompetitiveData,
 } from '@/lib/match-mode';
-import { leaderDistributionGap, separatedTournamentLeaders } from '@/lib/leader-race';
+import { leaderDistributionGap, leaderSeparationWeight, separatedTournamentLeaders } from '@/lib/leader-race';
 import { playerMomentExplanation } from '@/lib/team-explanation';
 
 type Player = Pick<
@@ -41,7 +41,7 @@ type TeamPair = BalancedTeams<Player>;
 type ParsedLine = {
   raw: string;
   value: string;
-  status: 'matched' | 'ambiguous' | 'unknown' | 'duplicate' | 'reserve' | 'excluded' | 'unconfirmed' | 'rotated_in' | 'rotated_out';
+  status: 'matched' | 'ambiguous' | 'unknown' | 'duplicate' | 'reserve' | 'excluded' | 'unconfirmed' | 'promoted_in' | 'rotated_in' | 'rotated_out';
   playerId: number | null;
   player: string | null;
   candidates: Array<{ playerId: number; player: string; score: number }>;
@@ -54,8 +54,11 @@ type ParsedLine = {
   replacedByPlayer?: string;
   tieBreakRandom?: boolean;
   rotationReason?: string;
+  promotionReason?: string;
+  waitingOrder?: number;
+  originalReserve?: boolean;
 };
-type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; rotationChanges: number; rotationThreshold: number; complete: boolean };
+type ParsedList = { items: ParsedLine[]; capacity: number | null; acceptedCount: number; waitingCount: number; filledVacancies: number; rotationChanges: number; rotationThreshold: number; complete: boolean; whatsappText: string };
 
 export function TeamBuilder({
   games,
@@ -161,6 +164,7 @@ export function TeamBuilder({
     [parsing, setParsing] = useState(false),
     [savingLineup, setSavingLineup] = useState(false),
     [lineupSaved, setLineupSaved] = useState(false),
+    [listCopied, setListCopied] = useState(false),
     [leaderRuleApplied, setLeaderRuleApplied] = useState(false);
   const players = useMemo(
     () => [...profilePlayers, ...guests],
@@ -227,7 +231,8 @@ export function TeamBuilder({
       });
       const body = await response.json() as Partial<ParsedList> & { error?: string };
       if (!response.ok) throw new Error(body.error || 'No se pudo interpretar la lista');
-      setParsedList({ items: body.items ?? [], capacity: body.capacity ?? null, acceptedCount: body.acceptedCount ?? 0, waitingCount: body.waitingCount ?? 0, rotationChanges: body.rotationChanges ?? 0, rotationThreshold: body.rotationThreshold ?? 2, complete: body.complete ?? false });
+      setParsedList({ items: body.items ?? [], capacity: body.capacity ?? null, acceptedCount: body.acceptedCount ?? 0, waitingCount: body.waitingCount ?? 0, filledVacancies: body.filledVacancies ?? 0, rotationChanges: body.rotationChanges ?? 0, rotationThreshold: body.rotationThreshold ?? 2, complete: body.complete ?? false, whatsappText: body.whatsappText ?? '' });
+      setListCopied(false);
       if (body.capacity) setCapacityAnswer('');
       setResolutions({});
     } catch (error) {
@@ -239,7 +244,7 @@ export function TeamBuilder({
   const useParsedList = () => {
     const names = parsedList?.items.flatMap((line, index) => {
       if (!line.accepted) return [];
-      if ((line.status === 'matched' || line.status === 'rotated_in') && line.player) return [line.player];
+      if ((line.status === 'matched' || line.status === 'promoted_in' || line.status === 'rotated_in') && line.player) return [line.player];
       const choice = resolutions[index];
       return choice ? [choice] : [];
     }) ?? [];
@@ -266,7 +271,13 @@ export function TeamBuilder({
     const leaders = friendly ? [] : separatedLeaders.filter((name) => selected.includes(name));
     const baseline = splitBalancedTeams(selectedPlayers, validGames);
     const result = leaders.length >= 2
-      ? splitBalancedTeams(selectedPlayers, validGames, { leaders })
+      ? splitBalancedTeams(selectedPlayers, validGames, {
+          leaders,
+          leaderWeight: leaderSeparationWeight(
+            tournamentState.matchDays,
+            selectedTournamentEdition?.matchdayCount ?? 0,
+          ),
+        })
       : baseline;
     setLeaderRuleApplied(
       leaders.length >= 2 &&
@@ -340,6 +351,7 @@ export function TeamBuilder({
                   <strong>{parsedList.capacity ? `${parsedList.acceptedCount}/${parsedList.capacity} lugares confirmados` : `${parsedList.acceptedCount} confirmados · cupo no detectado`}</strong>
                   <span className="ml-2 text-muted-foreground">{parsedList.waitingCount ? `· ${parsedList.waitingCount} esperando como suplente` : ''}</span>
                   {parsedList.capacity && !parsedList.complete && <small className="mt-1 block text-[#a05722]">La convocatoria todavía no completa el cupo detectado.</small>}
+                  {parsedList.filledVacancies > 0 && <small className="mt-1 block font-bold text-[#347a52]">Se completaron {parsedList.filledVacancies} lugar{parsedList.filledVacancies === 1 ? '' : 'es'} libre{parsedList.filledVacancies === 1 ? '' : 's'} con los primeros suplentes que pusieron IN.</small>}
                   {parsedList.rotationThreshold === 1 && <small className="mt-1 block font-bold text-[#805014]">Fecha 2: quien jugó la inauguración puede ceder su lugar a un suplente con IN que todavía no jugó.</small>}
                   {parsedList.rotationChanges > 0 && <small className="mt-1 block font-bold text-[#347a52]">Se aplicaron {parsedList.rotationChanges} cambio{parsedList.rotationChanges === 1 ? '' : 's'} por rotación.</small>}
                 </div>
@@ -372,7 +384,8 @@ export function TeamBuilder({
                   <div key={`${line.raw}-${index}`} className="grid gap-2 rounded-lg border p-2 text-sm sm:grid-cols-[1fr_1fr] sm:items-center">
                     <span><strong>{line.value}</strong><small className="block text-muted-foreground">{line.raw}</small></span>
                     {line.status === 'matched' ? <span className="font-bold text-[#347a52]">✓ {line.player} · {line.consecutiveAppearances ?? 0} PJ seguidos</span>
-                      : line.status === 'rotated_in' ? <span className="font-bold text-[#347a52]">↥ Entra {line.player} ({line.consecutiveAppearances ?? 0} PJ) por {line.replacesPlayer}</span>
+                      : line.status === 'promoted_in' ? <span className="font-bold text-[#347a52]">↥ Entra {line.player} para completar un lugar libre</span>
+                        : line.status === 'rotated_in' ? <span className="font-bold text-[#347a52]">↥ Entra {line.player} ({line.consecutiveAppearances ?? 0} PJ) por {line.replacesPlayer}</span>
                         : line.status === 'rotated_out' ? <span className="font-bold text-[#b64936]">↧ Cede su lugar a {line.replacedByPlayer} · {line.consecutiveAppearances ?? 0} PJ seguidos</span>
                       : line.status === 'duplicate' ? <span className="font-bold text-[#c47a16]">Repetido: {line.player}</span>
                         : line.status === 'reserve' ? <span className="font-bold text-[#7c6a43]">Suplente: espera fuera del cupo{line.player ? ` · ${line.player}` : ''}</span>
@@ -390,6 +403,28 @@ export function TeamBuilder({
                     <strong>Por qué se hizo el cambio:</strong> {line.rotationReason}
                   </p>
                 ))}
+                {parsedList.whatsappText && (
+                  <section className="rounded-xl border border-[#173d2a]/20 bg-[#fffaf0] p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <strong className="block text-[#173d2a]">Lista final para WhatsApp</strong>
+                        <small className="text-muted-foreground">Titulares y suplentes, incluyendo el orden de reemplazo.</small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(parsedList.whatsappText);
+                          setListCopied(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#173d2a] px-4 py-2 text-sm font-bold text-white"
+                      >
+                        {listCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                        {listCopied ? 'Lista copiada' : 'Copiar lista para WhatsApp'}
+                      </button>
+                    </div>
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-3 text-sm text-[#173d2a]">{parsedList.whatsappText}</pre>
+                  </section>
+                )}
                 <button type="button" disabled={parsedList.capacity === null} onClick={useParsedList} className="mt-2 w-full rounded-lg bg-[#e34f32] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Usar convocatoria propuesta</button>
               </div>
             )}
@@ -563,6 +598,7 @@ export function TeamBuilder({
                   selectedTournament,
                   separatedLeaders,
                   selectedTournamentEdition?.standings ?? [],
+                  profiles,
                 ))}
               >
                 <Flame /> Datos para la previa

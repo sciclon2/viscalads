@@ -161,6 +161,43 @@ class TournamentTests(unittest.TestCase):
         self.assertEqual(-1, loser["negativePoints"])
         self.assertEqual(3, winner["totalPoints"])
 
+    def test_standings_break_point_ties_by_goals_then_name(self):
+        tournament_id = create_tournament(self.connection, "sarria", {
+            "displayName": "Torneo con desempate", "startsOn": "2027-04-15",
+            "matchdayCount": 3, "ruleCode": "none",
+        })
+        players = self.connection.execute(
+            "SELECT id, canonical_name FROM players ORDER BY canonical_name COLLATE NOCASE LIMIT 4"
+        ).fetchall()
+        for index, (winner, loser, goals) in enumerate([
+            (players[0], players[1], 1),
+            (players[2], players[3], 3),
+        ]):
+            match_id = self.connection.execute(
+                "INSERT INTO matches(played_on,tournament_id,score_team1,score_team2,outcome,result_quality,coverage_status) "
+                "VALUES (?,?,3,1,'1','exact score','verified')",
+                (f"2027-04-{15 + index * 7:02d}", tournament_id),
+            ).lastrowid
+            self.connection.execute(
+                "INSERT INTO match_players(match_id,player_id,team_no,lineup_order) VALUES (?,?,1,1)",
+                (match_id, winner["id"]),
+            )
+            self.connection.execute(
+                "INSERT INTO match_players(match_id,player_id,team_no,lineup_order) VALUES (?,?,2,1)",
+                (match_id, loser["id"]),
+            )
+            self.connection.execute(
+                "INSERT INTO match_goals(match_id,team_no,player_id,goal_count) VALUES (?,1,?,?)",
+                (match_id, winner["id"], goals),
+            )
+
+        table = tournament_standings(self.connection, tournament_id)
+
+        self.assertEqual(players[2]["canonical_name"], table[0]["name"])
+        self.assertEqual(players[0]["canonical_name"], table[1]["name"])
+        tied_without_goals = [row["name"] for row in table if row["totalPoints"] == 0]
+        self.assertEqual(sorted(tied_without_goals, key=str.lower), tied_without_goals)
+
     def test_rules_cannot_be_changed_after_creation(self):
         tournament_id = create_tournament(self.connection, "sarria", {
             "displayName": "Reglas cerradas", "startsOn": "2027-06-01",

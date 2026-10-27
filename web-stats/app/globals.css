@@ -1647,6 +1647,48 @@
   margin-top: auto;
   padding: 8px 10px;
 }
+.own-goals-editor {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: rgba(16, 38, 25, 0.7);
+  padding: 11px;
+  color: #fff;
+}
+.own-goals-editor > strong {
+  font-size: 0.82rem;
+}
+.own-goals-editor > small {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.68rem;
+}
+.own-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 7px;
+}
+.own-goals-grid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 8px;
+  color: #294a39;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+.own-goals-grid input {
+  width: 48px;
+  height: 32px;
+  border: 1px solid #bdc9bf;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 6px;
+  color: #173d2a;
+}
 .match-score {
   position: absolute;
   z-index: 3;
