@@ -1,51 +1,63 @@
-# NKOS Lab
+# Viscalads web application
 
-Interfaz local para consultar el historial reconstruido de partidos de Sarrià y Bogatell sin mezclar sus estadísticas. La portada permite elegir la competición antes de entrar al dashboard.
+Local React/Vinext interface for the Viscalads SQLite history. Sarrià and
+Bogatell share player identities but keep matches and statistics isolated.
 
-Consultas incluidas: armador de equipos, forma actual, ranking por efectividad, tabla de puntos, porcentaje de derrotas, compañeros, rivales y némesis, duplas, ternas, rendimiento por torneo, prime por bloques, historial de partidos, récords, cobertura y palmarés. La sección **Torneos** muestra las ediciones de la competencia desde la más reciente, permite abrir sus partidos y crear la siguiente edición indicando fecha inicial y cantidad de fechas.
+For a clean installation, read [Local installation and usage](../docs/local-setup.md).
+For the administrator workflow, read [Tournament operations](../docs/tournaments.md).
+The project architecture, data rules and API surface are documented in the
+[main README](../README.md).
 
-## Abrir la web
+## Development
+
+Requirements: Node.js 22.13.0 or newer, pnpm 10 or newer, and the repository's
+Python environment.
 
 ```bash
-cd web-stats
+pnpm install
 pnpm dev
 ```
 
-Luego abrir `http://localhost:3000`.
-
-## Actualizar los datos
-
-SQLite (`data/sciclon2.sqlite3`) es la fuente operativa. Para regenerar el JSON después de un cambio validado:
+`pnpm dev` starts the API at `http://127.0.0.1:8765` and the interface at
+`http://localhost:3000`. The processes can be started separately with:
 
 ```bash
-make audit export
+pnpm api
+pnpm dev:web
 ```
 
-Los CSV históricos fueron retirados. No existe ningún flujo de reconstrucción que pueda sobrescribir SQLite.
+The live interface requests `GET /api/stats`; it does not read
+`lib/stats-data.json`. That JSON file is retained only for compatibility and
+offline reports.
 
-## Agregar consultas
+## Important modules
 
-1. Registrar nombre, descripción y filtros en `lib/query-catalog.ts`.
-2. Añadir el adaptador de datos en `components/stats-dashboard.tsx`.
-3. Si hacen falta datos derivados nuevos, extender `scripts/build-data.py`.
+- `app/page.tsx`: application entry point and competition/view routing.
+- `lib/stats-context.tsx`: live API loading and shared payload types.
+- `components/stats-dashboard.tsx`: dashboard and section composition.
+- `components/team-builder.tsx`: selection, WhatsApp import, team proposal and explanations.
+- `lib/team-balancer.ts`: pure formation, rating, chemistry and leader-balancing algorithm.
+- `lib/leader-race.ts`: tournament progress and detached-leader weighting.
+- `lib/prematch-facts.ts`: verified, team-aware prematch facts.
+- `components/match-entry.tsx`: match, guest and goal entry.
 
-`app/page.tsx` es la entrada y portada: valida la competición solicitada y monta el dashboard correspondiente. La lógica interactiva de estadísticas vive en `components/stats-dashboard.tsx`.
+The team builder receives competition-specific current levels calculated by the
+API, profile positions and verified match history. It supports five-, six- and
+eight-player formations, distributes goalkeepers, limits chemistry influence,
+and progressively separates a detached leading group from 40% of a tournament.
 
-El generador excluye el evento multiequipo de los cálculos de duplas y ternas, ya que sus participantes no forman dos equipos comparables.
+Temporary guests require a manual level from 1 to 10 and can have an optional
+position. They participate in balancing and recent lineup presets but never
+become players or receive personal statistics.
 
-## Datos del armador
+## Checks
 
-- `data/sciclon2.sqlite3`: jugadores, alias, posiciones, partidos, alineaciones, torneos y evidencia.
-- `lib/stats-data.json`: archivo generado desde SQLite que combina perfiles, partidos y estadísticas.
-- `lib/team-balancer.ts`: algoritmo puro y testeable de nivel, formación, porteros y química.
-- `components/team-builder.tsx`: selección, drag & drop, representación de la cancha y explicación humana del resultado.
+```bash
+pnpm test
+pnpm build
+pnpm lint
+```
 
-El balanceador no persiste cálculos paralelos: recibe los niveles específicos de la competición derivados de SQLite, las posiciones del perfil y los partidos verificados. Prioriza la diferencia de nivel actual, exige formaciones válidas cuando la convocatoria lo permite y penaliza el uso innecesario de posiciones alternativas.
-
-Si hay dos o más porteros, el algoritmo exige que ambos equipos reciban al menos uno y no aplica bonus. Si solo hay uno, añade al total de su equipo un 10% del nivel de ese portero y compensa la ventaja al buscar la división. La química se calcula dinámicamente con los mismos partidos verificados: una dupla necesita al menos cinco partidos compartidos, su influencia se reduce cuando la muestra es pequeña y queda limitada para que nunca domine al nivel o a la formación.
-
-Las pruebas del balanceador se ejecutan con `pnpm test` y cubren reparto de porteros, bonus único, muestra mínima de química y convocatorias inválidas.
-
-Los invitados del armador son temporales: requieren un nivel manual entre 1 y 10 y admiten una posición opcional. Sin posición se consideran flexibles. Participan del mismo cálculo de balance, pero no se insertan como jugadores ni acumulan estadísticas. La alineación sí se conserva entre los últimos cinco accesos rápidos, incluyendo el nombre temporal, nivel y posición del invitado.
-
-En la carga de partidos, los goles de un invitado se asignan a su participante temporal mediante `match_goals.guest_id`. Suman al marcador y a las estadísticas generales de goles del partido, pero nunca a un jugador. Los goles sin autor no se ofrecen para partidos nuevos; solo se conservan al editar registros históricos que ya carecen de goleadores identificados.
+The tests cover balancing, leader separation, ratings, achievements, prematch
+facts, WhatsApp parsing and tournament dates. The backend suite is run from the
+repository root with `make test`.
