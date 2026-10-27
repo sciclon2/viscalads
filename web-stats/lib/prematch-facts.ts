@@ -82,6 +82,7 @@ export function prematchFacts(
   separatedLeaders: string[] = [],
   tournamentStandings: Array<{ name: string; totalPoints: number }> = [],
   profiles: MomentProfile[] = [],
+  selectedTournamentLabel?: string,
 ): PrematchFact[] {
   const enabled = new Set(rules.map((rule) => rule.code));
   const title = (code: string) => rules.find((rule) => rule.code === code)?.title ?? code;
@@ -89,6 +90,7 @@ export function prematchFacts(
   const verified = globalGames.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
   const competitionGames = games.filter((game) => game.status === 'verified').sort((a, b) => a.date.localeCompare(b.date));
   const currentTournament = selectedTournament || [...competitionGames].reverse().find((game) => game.tournament)?.tournament;
+  const currentTournamentLabel = selectedTournamentLabel || currentTournament;
 
   if (enabled.has('moment_status_watch') && profiles.length) {
     const proposed = new Set([...teamA, ...teamB]);
@@ -139,15 +141,15 @@ export function prematchFacts(
     }).filter((item) => item.results.length >= 3);
     const unbeaten = tournamentForm.filter((item) => item.losses === 0).sort((a, b) => b.results.length - a.results.length)[0];
     if (enabled.has('tournament_unbeaten') && unbeaten)
-      facts.push({ code: 'tournament_unbeaten', title: title('tournament_unbeaten'), scope: 'competition', text: `${unbeaten.name} sigue invicto en ${currentTournament} después de ${unbeaten.results.length} partidos.` });
+      facts.push({ code: 'tournament_unbeaten', title: title('tournament_unbeaten'), scope: 'competition', text: `${unbeaten.name} sigue invicto en ${currentTournamentLabel} después de ${unbeaten.results.length} partidos.` });
     const winless = tournamentForm.filter((item) => item.wins === 0).sort((a, b) => b.results.length - a.results.length)[0];
     if (enabled.has('tournament_winless') && winless)
-      facts.push({ code: 'tournament_winless', title: title('tournament_winless'), scope: 'competition', text: `${winless.name} todavía no ganó en ${currentTournament} tras ${winless.results.length} partidos. Este puede ser el día de cortar la espera.` });
+      facts.push({ code: 'tournament_winless', title: title('tournament_winless'), scope: 'competition', text: `${winless.name} todavía no ganó en ${currentTournamentLabel} tras ${winless.results.length} partidos. Este puede ser el día de cortar la espera.` });
     if (enabled.has('leader_clash')) {
       const tournamentState = currentTournamentLeaders(tournamentGames);
       const leaders = tournamentState.leaders.filter(([name]) => separatedLeaders.includes(name)).slice(0, 2);
       if (leaders.length === 2 && inProposedOppositeTeams(leaders[0][0], leaders[1][0], teamA, teamB))
-        facts.push({ code: 'leader_clash', title: title('leader_clash'), scope: 'competition', text: `${leaders[0][0]} (${leaders[0][1]} pts) y ${leaders[1][0]} (${leaders[1][1]} pts), los dos primeros de ${currentTournament}, quedaron enfrentados directamente.` });
+        facts.push({ code: 'leader_clash', title: title('leader_clash'), scope: 'competition', text: `${leaders[0][0]} (${leaders[0][1]} pts) y ${leaders[1][0]} (${leaders[1][1]} pts), los dos primeros de ${currentTournamentLabel}, quedaron enfrentados directamente.` });
     }
   }
 

@@ -85,6 +85,33 @@ test('los datos del torneo respetan la edición seleccionada y los equipos propu
   assert.equal(prematchFacts(games, ['Ana'], ['Bea'], [], tournamentRules, games, 'T1').length, 0);
 });
 
+test('usa el código interno para filtrar el torneo y conserva su nombre visible', () => {
+  const tournamentRules: FactRule[] = [
+    { code: 'leader_clash', title: 'Duelo', description: '', priority: 1 },
+  ];
+  const games = [
+    { ...game('2026-09-16', '1'), tournament: 'SARRIA-11' },
+    { ...game('2026-09-23', '1'), tournament: 'SARRIA-11' },
+    { ...game('2026-09-30', '1'), tournament: 'SARRIA-11' },
+  ];
+  const facts = prematchFacts(
+    games,
+    ['Ana'],
+    ['Bea'],
+    [],
+    tournamentRules,
+    games,
+    'SARRIA-11',
+    ['Ana', 'Bea'],
+    [],
+    [],
+    'T11',
+  );
+  assert.equal(facts.length, 1);
+  assert.match(facts[0].text, /T11/);
+  assert.doesNotMatch(facts[0].text, /SARRIA-11/);
+});
+
 test('avisa cuando el próximo resultado puede desbloquear un parche sin mezclar competiciones', () => {
   const achievementRule: FactRule[] = [{ code: 'achievement_watch', title: 'Parche en juego', description: '', priority: 1 }];
   const games = [

@@ -127,16 +127,16 @@ export function TeamBuilder({
         : (currentTournament?.displayName ?? FRIENDLY_MODE),
     );
   }, [availableTournaments, currentTournament]);
+  const selectedTournamentEdition = availableTournaments.find(
+    (item) => item.displayName === selectedTournament,
+  );
   const tournamentState = useMemo(
     () => currentTournamentLeaders(
       isFriendlyMode(selectedTournament)
         ? []
-        : validGames.filter((game) => game.tournament === selectedTournament),
+        : validGames.filter((game) => game.tournament === selectedTournamentEdition?.code),
     ),
-    [validGames, selectedTournament],
-  );
-  const selectedTournamentEdition = availableTournaments.find(
-    (item) => item.displayName === selectedTournament,
+    [validGames, selectedTournament, selectedTournamentEdition?.code],
   );
   const separatedLeaders = useMemo(
     () => selectedTournamentEdition
@@ -595,10 +595,11 @@ export function TeamBuilder({
                   stats,
                   funnyFactRules,
                   globalGames,
-                  selectedTournament,
+                  selectedTournamentEdition?.code ?? selectedTournament,
                   separatedLeaders,
                   selectedTournamentEdition?.standings ?? [],
                   profiles,
+                  selectedTournament,
                 ))}
               >
                 <Flame /> Datos para la previa
